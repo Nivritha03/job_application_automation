@@ -1,0 +1,1 @@
+# LinkedIn Board Plugin package

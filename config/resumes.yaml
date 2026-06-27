@@ -1,0 +1,112 @@
+# =============================================================================
+# Resume Selection Configuration
+# =============================================================================
+# The agent picks the resume whose keywords or skills overlap best with the job description.
+# All filenames are relative to data/resumes/.
+# If no keywords or skills match, the first entry is used as the default.
+# =============================================================================
+
+fullstack:
+  keywords:
+    - python
+    - javascript
+    - react
+    - node
+    - django
+    - flask
+    - fastapi
+    - full stack
+    - full-stack
+    - frontend
+    - backend
+    - web development
+    - rest api
+    - docker
+  skills:
+    - Python
+    - Javascript
+    - React
+    - Node
+    - Django
+    - Flask
+    - FastAPI
+    - Docker
+    - HTML
+    - CSS
+    - SQL
+    - AWS
+    - Git
+  resume: Resume.pdf
+
+ml:
+  keywords:
+    - machine learning
+    - deep learning
+    - nlp
+    - natural language processing
+    - pytorch
+    - tensorflow
+    - huggingface
+    - llm
+    - transformer
+    - computer vision
+    - ai
+    - artificial intelligence
+    - scikit
+    - model training
+  skills:
+    - Python
+    - PyTorch
+    - TensorFlow
+    - NLP
+    - HuggingFace
+    - LLM
+    - Transformer
+    - Scikit-Learn
+    - Computer Vision
+    - Deep Learning
+  resume: Resume.pdf
+
+data:
+  keywords:
+    - data analytics
+    - data analysis
+    - sql
+    - power bi
+    - tableau
+    - pandas
+    - numpy
+    - data science
+    - statistics
+    - visualization
+    - excel
+    - data engineer
+  skills:
+    - SQL
+    - Power BI
+    - Tableau
+    - Pandas
+    - Numpy
+    - Data Science
+    - Statistics
+    - Excel
+    - Data Engineering
+  resume: Resume.pdf
+
+general:
+  keywords:
+    - software engineer
+    - software developer
+    - engineer
+    - developer
+    - intern
+    - graduate
+    - fresher
+  skills:
+    - Software Engineering
+    - Programming
+    - Problem Solving
+    - Git
+    - Algorithms
+    - Data Structures
+  resume: Resume.pdf

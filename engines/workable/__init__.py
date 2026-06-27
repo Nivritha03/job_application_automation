@@ -1,0 +1,1 @@
+# Workable Board Plugin package

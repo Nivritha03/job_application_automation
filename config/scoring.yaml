@@ -1,0 +1,15 @@
+positive:
+  python: 30
+  fastapi: 20
+  docker: 15
+  aws: 10
+  machine learning: 20
+  react: 10
+  sql: 15
+  backend: 20
+
+negative:
+  wordpress: -30
+  php: -20
+  ruby: -10
+  jquery: -20

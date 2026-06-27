@@ -1,0 +1,43 @@
+scheduler:
+  enabled: true
+  every_minutes: 120
+  random_delay: true
+  delay_min: 30
+  delay_max: 180
+
+limits:
+  max_daily_applications: 15
+  max_hourly_applications: 3
+  max_applications_per_company: 2
+
+boards:
+  greenhouse:
+    - reddit
+    - stripe
+    - figma
+    - openai
+  lever:
+    - entrata
+    - rippling
+    - posthog
+  ashby:
+    - anthropic
+    - cursor
+  workable:
+    - posthog
+  linkedin:
+    - easyapply
+
+browser:
+  headless: false
+  user_data_dir: "./browser_data"
+
+database:
+  path: "sqlite:///jobs.db"
+
+notifications:
+  enabled: false
+  to_email: "nivritha.pola@gmail.com"
+  smtp_server: "smtp.gmail.com"
+  smtp_port: 587
+  smtp_username: ""

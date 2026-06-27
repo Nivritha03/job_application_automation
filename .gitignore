@@ -1,0 +1,30 @@
+# Virtual environment
+.venv/
+venv/
+ENV/
+
+# Project database
+jobs.db
+jobs.db-journal
+
+# Screenshots and logs
+screenshots/
+logs/
+
+# Local configuration and credentials
+.env
+config/answers.yaml
+
+# Browser user data
+browser_data/
+browser/
+
+# Byte-compiled / Python files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS specific files
+.DS_Store
+Thumbs.db
