@@ -10,7 +10,55 @@ limits:
   max_hourly_applications: 3
   max_applications_per_company: 2
 
+search_keywords:
+  - python
+  - backend
+  - software engineer
+  - backend engineer
+  - machine learning
+  - frontend 
+  - frontend engineer
+  - developer
+  - frontend developer
+  - backend developer
+  - ai engineer
+  - data engineer
+  - data scientist
+  - full stack
+  - mern stack  
+  - django
+  - flask
+  - fastapi
+
+skip_keywords:
+  - manager
+  - director
+  - principal
+  - staff
+  - sales
+  - marketing
+  - hr
+  - legal
+
 boards:
+  naukri:
+    - jobs
+  instahyre:
+    - jobs
+  wellfound:
+    - jobs
+  hirist:
+    - jobs
+  cutshort:
+    - jobs
+  indeed:
+    - jobs
+  foundit:
+    - jobs
+  glassdoor:
+    - jobs
+  linkedin:
+    - easyapply
   greenhouse:
     - reddit
     - stripe
@@ -25,8 +73,6 @@ boards:
     - cursor
   workable:
     - posthog
-  linkedin:
-    - easyapply
 
 browser:
   headless: false

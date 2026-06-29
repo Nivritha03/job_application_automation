@@ -14,7 +14,10 @@ class LeverSearch(BaseSearchEngine):
         jobs_found = []
         try:
             self.page.goto(url)
-            self.page.wait_for_load_state("networkidle")
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                logger.warning("LeverSearch: networkidle timeout exceeded on page load — proceeding.")
             time.sleep(2)
             
             # Find all anchor tags on the page

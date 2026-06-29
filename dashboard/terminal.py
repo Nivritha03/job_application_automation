@@ -1,15 +1,19 @@
+import os
 import sys
 import time
 from datetime import datetime
+
+# Add the project root to sys.path to enable importing core modules from any context
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
 from rich.prompt import Prompt
 from core.database import SessionLocal, init_db
-from core.models import DBRun, DBJob, DBApplication, DBCompany
+from core.models import DBRun, DBJob, DBApplication, DBCompany, Job
 from core.browser import PlaywrightManager
 from core.plugins import APPLY_ENGINES
-from core.models import Job
 from loguru import logger
 
 console = Console()
@@ -243,3 +247,6 @@ def _view_company_profiles(db):
     console.print(table)
     console.print("\n")
     Prompt.ask("Press Enter to return to main menu")
+
+if __name__ == "__main__":
+    show_dashboard()

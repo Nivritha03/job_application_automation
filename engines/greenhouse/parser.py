@@ -11,7 +11,10 @@ class GreenhouseJobParser(BaseJobParser):
         logger.info(f"GreenhouseJobParser: Parsing details for: {job.title} at {job.company}")
         try:
             self.page.goto(job.url)
-            self.page.wait_for_load_state("networkidle")
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
             time.sleep(1)
             
             # Greenhouse specific selectors

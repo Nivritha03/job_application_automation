@@ -14,7 +14,10 @@ class WorkableSearch(BaseSearchEngine):
         jobs_found = []
         try:
             self.page.goto(url)
-            self.page.wait_for_load_state("networkidle")
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                logger.warning("WorkableSearch: networkidle timeout exceeded on page load — proceeding.")
             time.sleep(2.5)
             
             # Handle Workable "Show more" pagination load-more button

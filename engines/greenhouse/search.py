@@ -14,7 +14,10 @@ class GreenhouseSearch(BaseSearchEngine):
         jobs_found = []
         try:
             self.page.goto(url)
-            self.page.wait_for_load_state("networkidle")
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                logger.warning("GreenhouseSearch: networkidle timeout exceeded on page load — proceeding.")
             time.sleep(2)
             
             # Use search inputs if present to filter by keyword
@@ -23,7 +26,10 @@ class GreenhouseSearch(BaseSearchEngine):
                 if search_inputs and query:
                     search_inputs[0].fill(query)
                     search_inputs[0].press("Enter")
-                    self.page.wait_for_load_state("networkidle")
+                    try:
+                        self.page.wait_for_load_state("networkidle", timeout=10000)
+                    except Exception:
+                        pass
                     time.sleep(1.5)
             except Exception:
                 pass

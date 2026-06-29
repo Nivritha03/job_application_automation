@@ -1,7 +1,0 @@
-{
-  "languages": ["Python", "JavaScript", "SQL", "Bash"],
-  "frameworks": ["FastAPI", "React", "Node.js", "Django"],
-  "tools": ["Docker", "Git", "Playwright", "GitHub Actions"],
-  "cloud": ["AWS", "GCP"],
-  "ai_ml": ["PyTorch", "TensorFlow", "OpenAI API", "LangChain"]
-}

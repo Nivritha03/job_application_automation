@@ -37,7 +37,7 @@ class BaseApplyEngine(UniversalApplyEngine):
             screenshot_cb("before_fill")
 
         # 4. Fill
-        self.filler.fill(profile_fields, questions, job.resume_used)
+        self.filler.fill(profile_fields, questions, job.resume_used, engine=self)
 
         # 5. After-fill + before-submit screenshots
         if screenshot_cb:

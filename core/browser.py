@@ -22,7 +22,12 @@ class PlaywrightManager:
             user_data_dir=self.user_data_dir,
             headless=self.headless,
             viewport={"width": 1280, "height": 720},
-            args=["--disable-blink-features=AutomationControlled"] 
+            args=[
+                "--disable-blink-features=AutomationControlled",
+                "--disable-gpu",
+                "--disable-dev-shm-usage",
+                "--no-sandbox"
+            ] 
         )
         return self._context
 

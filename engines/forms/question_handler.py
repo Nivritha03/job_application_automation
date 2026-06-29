@@ -186,7 +186,7 @@ class QuestionClassifier:
         label_lower = label.lower()
         if "pronoun" in label_lower:
             return "PRONOUNS"
-        if "gender" in label_lower:
+        if any(w in label_lower for w in ["gender", "sex", "male", "female", "transgender"]):
             return "GENDER"
         if any(w in label_lower for w in ["ethnicity", "race", "origin", "background"]):
             return "ETHNICITY"

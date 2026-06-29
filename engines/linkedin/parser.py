@@ -8,13 +8,21 @@ class LinkedInJobParser(BaseJobParser):
     def extract_details(self, job: Job) -> Job:
         logger.info(f"LinkedInJobParser: Extracting details for {job.url}")
         try:
-            self.page.goto(job.url)
-            self.page.wait_for_load_state("networkidle")
-            time.sleep(2)
+            try:
+                self.page.goto(job.url, wait_until="domcontentloaded", timeout=15000)
+            except Exception as goto_err:
+                logger.warning(f"LinkedInJobParser: Page navigation warning (proceeding): {goto_err}")
+                
+            try:
+                self.page.wait_for_selector(".job-details-jobs-unified-top-card__job-title, h1, #job-details", timeout=15000)
+            except Exception as wait_err:
+                logger.warning(f"LinkedInJobParser: Timeout waiting for selectors: {wait_err}")
+            time.sleep(1)
             
             # Check login page redirects
             if "login" in self.page.url or "signin" in self.page.url:
                 logger.error("LinkedInJobParser: User is not authenticated.")
+                job.error_message = "LinkedIn redirected to login page. Please check authentication."
                 return job
                 
             # Title
@@ -28,14 +36,33 @@ class LinkedInJobParser(BaseJobParser):
                 job.company = comp_loc.inner_text().strip()
                 
             # Location
-            loc_loc = self.page.locator(".job-details-jobs-unified-top-card__bullet, .jobs-unified-top-card__bullet").first
-            if loc_loc.count() > 0:
+            loc_loc = self.page.locator(".job-details-jobs-unified-top-card__bullet, .jobs-unified-top-card__bullet, [class*='topcard__flavor--bullet']").first
+            if loc_loc.count() > 0 and loc_loc.inner_text().strip():
                 job.location = loc_loc.inner_text().strip()
             else:
-                job.location = "Remote / United States"
+                # Fallback: scan spans, paragraphs, and list items for India technology hubs or location patterns
+                found_loc = ""
+                INDIA_KEYWORDS = ["india", "bangalore", "bengaluru", "hyderabad", "pune", "chennai", "mumbai", "noida", "gurgaon", "gurugram", "delhi", "kolkata", "ahmedabad"]
+                for selector in ["span", "p", "div", "a"]:
+                    try:
+                        for el in self.page.locator(selector).all():
+                            try:
+                                txt = el.inner_text().strip()
+                                # Location is typically brief (under 60 chars) and contains a major city or "India"
+                                if len(txt) > 2 and len(txt) < 60 and any(city in txt.lower() for city in INDIA_KEYWORDS):
+                                    if "set alert" not in txt.lower() and "notification" not in txt.lower() and "jobs" not in txt.lower() and "applied" not in txt.lower():
+                                        found_loc = txt
+                                        break
+                            except:
+                                pass
+                    except:
+                        pass
+                    if found_loc:
+                        break
+                job.location = found_loc or "Remote / United States"
                 
             # Description & Requirements
-            desc_loc = self.page.locator("#job-details, .jobs-description__content, .jobs-box__html-content").first
+            desc_loc = self.page.locator("#job-details, .jobs-description__content, .jobs-box__html-content, [class*='description']").first
             if desc_loc.count() > 0:
                 job.description = desc_loc.inner_html().strip()
                 text_content = desc_loc.inner_text()
@@ -70,5 +97,6 @@ class LinkedInJobParser(BaseJobParser):
                     
         except Exception as e:
             logger.error(f"LinkedInJobParser: Failed to extract details: {e}")
+            job.error_message = str(e)
             
         return job

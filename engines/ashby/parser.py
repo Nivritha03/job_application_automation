@@ -9,7 +9,10 @@ class AshbyJobParser(BaseJobParser):
         logger.info(f"AshbyJobParser: Extracting details for {job.url}")
         try:
             self.page.goto(job.url)
-            self.page.wait_for_load_state("networkidle")
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
             time.sleep(2)
             
             # Title
@@ -55,5 +58,6 @@ class AshbyJobParser(BaseJobParser):
                 
         except Exception as e:
             logger.error(f"AshbyJobParser: Failed to parse details: {e}")
+            job.error_message = str(e)
             
         return job

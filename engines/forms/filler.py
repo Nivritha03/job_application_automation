@@ -34,7 +34,7 @@ class FormFiller:
 
     # ─── Public API ────────────────────────────────────────────────────────────
 
-    def fill(self, profile_fields: dict, questions: dict, resume_filename: str):
+    def fill(self, profile_fields: dict, questions: dict, resume_filename: str, engine=None):
         """
         Fill standard profile fields, upload resume, and answer Q&A questions.
 
@@ -44,7 +44,7 @@ class FormFiller:
             resume_filename: filename inside data/resumes/
         """
         self._fill_profile(profile_fields, resume_filename)
-        self._answer_questions(questions)
+        self._answer_questions(questions, engine)
 
     # ─── Profile field filling ─────────────────────────────────────────────────
 
@@ -236,11 +236,11 @@ class FormFiller:
 
     # ─── Question answering ────────────────────────────────────────────────────
 
-    def _answer_questions(self, questions: dict):
+    def _answer_questions(self, questions: dict, engine=None):
         if not questions:
             return
         logger.info(f"FormFiller: Answering {len(questions)} form question(s)...")
-        results = self.question_handler.answer_all(questions)
+        results = self.question_handler.answer_all(questions, engine)
 
         unanswered = [q for q, status in results.items() if status == "unanswered"]
         if unanswered:

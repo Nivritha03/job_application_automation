@@ -39,6 +39,30 @@ class UniversalApplyEngine(ABC):
         """
         try:
             logger.info(f"UniversalEngine: fill_select label={fg.label_raw!r} value={value[:60]!r}")
+            
+            # Native HTML select support
+            try:
+                tag_name = fg.locator.evaluate("e => e.tagName").lower()
+                if tag_name == "select":
+                    logger.info(f"UniversalEngine: Selecting native select option for '{fg.label_raw}'")
+                    options = fg.locator.locator("option").all()
+                    selected = False
+                    for opt in options:
+                        opt_text = opt.inner_text().strip()
+                        opt_val = opt.get_attribute("value") or ""
+                        if self._is_matching_option(opt_text, value) or self._is_matching_option(opt_val, value):
+                            fg.locator.select_option(value=opt_val)
+                            logger.info(f"UniversalEngine: Selected native select option: {opt_text} ({opt_val})")
+                            selected = True
+                            break
+                    if not selected and len(options) > 1:
+                        # Fallback select first option
+                        opt_val = options[1].get_attribute("value") or ""
+                        fg.locator.select_option(value=opt_val)
+                    return True
+            except Exception as select_err:
+                logger.warning(f"UniversalEngine: Native select check failed/skipped: {select_err}")
+
             # Try to click the parent wrapper (e.g. .select__control or parent div) to open React Select dropdowns.
             clicked = False
             try:

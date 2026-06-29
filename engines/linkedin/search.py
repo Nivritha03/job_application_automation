@@ -18,9 +18,11 @@ class LinkedInSearch(BaseSearchEngine):
         
         jobs_found = []
         try:
-            self.page.goto(url)
-            self.page.wait_for_load_state("networkidle")
-            time.sleep(3.5)
+            try:
+                self.page.goto(url, wait_until="domcontentloaded", timeout=15000)
+            except Exception as goto_err:
+                logger.warning(f"LinkedInSearch: Page navigation warning (proceeding): {goto_err}")
+            time.sleep(2)
             
             # Check if login is required
             if "login" in self.page.url or "signin" in self.page.url:
@@ -50,6 +52,9 @@ class LinkedInSearch(BaseSearchEngine):
                         
                     # Normalize URL to prevent query duplicates
                     abs_url = href.split("?")[0]
+                    if abs_url.startswith("/"):
+                        abs_url = f"https://www.linkedin.com{abs_url}"
+                        
                     if "/jobs/view/" not in abs_url:
                         continue
                         
@@ -57,13 +62,27 @@ class LinkedInSearch(BaseSearchEngine):
                     
                     # Click on card to load detail pane
                     card.scroll_into_view_if_needed()
-                    card.click()
-                    time.sleep(1.5)
-                    
-                    # Verify if "Easy Apply" button is present on detail pane
-                    easy_apply_btn = self.page.locator("button.jobs-apply-button")
-                    if easy_apply_btn.count() == 0 or not easy_apply_btn.first.is_visible():
-                        logger.debug(f"LinkedInSearch: Job '{title}' is not an Easy Apply job. Skipping.")
+                    try:
+                        card.click(timeout=5000)
+                    except Exception as click_err:
+                        logger.warning(f"LinkedInSearch: Failed to click card: {click_err}")
+                        continue
+                        
+                    # Wait up to 5 seconds for details/apply button to load
+                    try:
+                        self.page.wait_for_selector("button.jobs-apply-button", timeout=5000)
+                    except Exception:
+                        pass
+                        
+                    # Verify if "Easy Apply" button is present and is an Easy Apply flow
+                    easy_apply_btn = self.page.locator("button.jobs-apply-button").first
+                    if easy_apply_btn.count() == 0 or not easy_apply_btn.is_visible():
+                        logger.debug(f"LinkedInSearch: Job '{title}' has no visible apply button. Skipping.")
+                        continue
+                        
+                    btn_text = easy_apply_btn.inner_text().strip().lower()
+                    if "easy apply" not in btn_text:
+                        logger.debug(f"LinkedInSearch: Job '{title}' is not an Easy Apply job (btn text: '{btn_text}'). Skipping.")
                         continue
                         
                     # Extract company name from active detail pane

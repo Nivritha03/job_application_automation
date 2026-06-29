@@ -27,6 +27,9 @@ class Job(BaseModel):
     status: str = "discovered" # discovered, filtered, applied, error
     error_message: str = ""
     screenshot_path: str = ""
+    failure_type: Optional[str] = None
+    retry_after: Optional[datetime] = None
+    platform: str = ""
     
 # -------------------------------------------------------------------
 # SQLAlchemy Models (Database Persistence)

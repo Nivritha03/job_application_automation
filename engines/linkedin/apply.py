@@ -29,8 +29,14 @@ class LinkedInApply(UniversalApplyEngine):
         try:
             # ── 1. Navigate to Job View ───────────────────────────────────────
             if self.page.url.rstrip("/") != job.url.rstrip("/"):
-                self.page.goto(job.url)
-            self.page.wait_for_load_state("networkidle")
+                try:
+                    self.page.goto(job.url, wait_until="domcontentloaded", timeout=15000)
+                except Exception as goto_err:
+                    logger.warning(f"LinkedInApply: Page navigation warning: {goto_err}")
+            try:
+                self.page.wait_for_load_state("networkidle", timeout=10000)
+            except Exception:
+                pass
             time.sleep(2)
             
             # Check login page redirect
@@ -40,24 +46,46 @@ class LinkedInApply(UniversalApplyEngine):
                 return False
 
             # Check and click "Easy Apply" button
-            easy_apply_btn = self.page.locator("button.jobs-apply-button")
-            if easy_apply_btn.count() == 0 or not easy_apply_btn.first.is_visible():
-                logger.warning("LinkedInApply: Easy Apply button is not visible. Skipping.")
+            easy_apply_btn = None
+            for btn in self.page.locator("button.jobs-apply-button, button:has-text('Easy Apply'), button:has-text('Apply now')").all():
+                try:
+                    if btn.is_visible() and btn.is_enabled():
+                        easy_apply_btn = btn
+                        break
+                except:
+                    pass
+                    
+            if not easy_apply_btn:
+                logger.warning("LinkedInApply: Easy Apply button is not visible or enabled. Skipping.")
                 job.failure_type = "APPLICATION_CLOSED"
                 return False
                 
             self.take_screenshot("before_fill", job.title)
-            easy_apply_btn.first.click()
-            time.sleep(2)
-
-            # Wait for modal dialog
-            modal_selector = "div.jobs-easy-apply-modal, div[role='dialog']"
-            try:
-                self.page.wait_for_selector(modal_selector, timeout=8000)
-            except Exception:
-                logger.error("LinkedInApply: Easy Apply modal failed to load.")
-                job.failure_type = "UNKNOWN_SELECTOR"
-                return False
+            
+            modal_selector = "dialog, div.jobs-easy-apply-modal, div[role='dialog'], [class*='easy-apply-modal']"
+            clicked_successfully = False
+            for attempt in range(3):
+                try:
+                    logger.info(f"LinkedInApply: Attempting to click Easy Apply button (Attempt {attempt+1})")
+                    easy_apply_btn.scroll_into_view_if_needed()
+                    easy_apply_btn.click(force=True)
+                    time.sleep(2)
+                    # Check if modal loaded
+                    modal_check = self.page.locator(modal_selector).first
+                    if modal_check.count() > 0 and modal_check.is_visible():
+                        clicked_successfully = True
+                        break
+                except Exception as click_err:
+                    logger.warning(f"LinkedInApply: Click attempt {attempt+1} warning: {click_err}")
+                time.sleep(1.5)
+                
+            if not clicked_successfully:
+                try:
+                    self.page.wait_for_selector(modal_selector, timeout=5000)
+                except Exception:
+                    logger.error("LinkedInApply: Easy Apply modal failed to load after multiple click attempts.")
+                    job.failure_type = "UNKNOWN_SELECTOR"
+                    return False
 
             # ── 2. Interactive Multi-Step Form Automation Loop ────────────────
             step_count = 1

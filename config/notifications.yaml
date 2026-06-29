@@ -1,0 +1,14 @@
+telegram:
+  enabled: true
+  bot_token: ""
+  chat_id: ""
+
+notifications:
+  on_job_found: false
+  on_match: false
+  on_apply_success: true
+  on_apply_failed: true
+  on_retry: true
+  on_pipeline_start: true
+  on_pipeline_complete: true
+  on_daily_summary: true
