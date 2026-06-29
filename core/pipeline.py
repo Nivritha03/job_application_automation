@@ -74,10 +74,23 @@ class Pipeline:
         
     def _check_login_status(self, platform: str, page) -> bool:
         url = page.url.lower()
-        if "login" in url or "signin" in url or "signup" in url:
+        
+        # Define keywords that indicate authentication, signup, checkpoints, OTP, or verification challenges
+        auth_keywords = [
+            "login", "signin", "signup", "register", "join", "auth",
+            "challenge", "checkpoint", "verify", "verification", 
+            "otp", "security", "captcha", "mfa", "confirm"
+        ]
+        
+        if any(kw in url for kw in auth_keywords):
             return False
             
         try:
+            # Check if body text contains verification or OTP prompts
+            body_text = page.locator("body").inner_text().lower()
+            if any(w in body_text for w in ["verification code", "security code", "confirm you're a human", "otp", "enter the code", "checkpoint"]):
+                return False
+                
             if platform == "linkedin":
                 if page.locator("input#username").count() > 0 or \
                    page.locator("a:has-text('Sign in')").first.is_visible() or \
@@ -538,8 +551,11 @@ class Pipeline:
                                 logger.info(f"Pipeline: Waiting for manual login on '{platform}' ({elapsed}s elapsed)...")
                                 time.sleep(3)
                                 if self._check_login_status(platform, page):
-                                    login_success = True
-                                    break
+                                    # Double check after a short delay to ensure any page redirections are settled
+                                    time.sleep(4)
+                                    if self._check_login_status(platform, page):
+                                        login_success = True
+                                        break
                                     
                             if login_success:
                                 logger.info(f"Pipeline: Manual login detected for '{platform}'! Continuing.")
