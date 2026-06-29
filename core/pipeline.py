@@ -665,7 +665,7 @@ class Pipeline:
                         is_location_mismatch = False
                         if self.location:
                             loc_query = self.location.lower().strip()
-                            job_loc = job.location.lower()
+                            job_loc = job.location.lower().strip()
                             if loc_query == "india":
                                 INDIA_LOCATIONS = [
                                     "india",
@@ -683,10 +683,13 @@ class Pipeline:
                                     "ahmedabad",
                                     "remote - india",
                                 ]
-                                if not any(l_token in job_loc for l_token in INDIA_LOCATIONS):
+                                # Allow remote, wfh, anywhere, or empty locations to bypass strict location filters
+                                if job_loc == "" or any(term in job_loc for term in ["remote", "anywhere", "wfh", "work from home"]):
+                                    is_location_mismatch = False
+                                elif not any(l_token in job_loc for l_token in INDIA_LOCATIONS):
                                     is_location_mismatch = True
                             else:
-                                if loc_query not in job_loc:
+                                if job_loc != "" and loc_query not in job_loc and not any(term in job_loc for term in ["remote", "anywhere"]):
                                     is_location_mismatch = True
                                     
                         if is_location_mismatch:

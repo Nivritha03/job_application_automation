@@ -29,6 +29,7 @@ search_keywords:
   - django
   - flask
   - fastapi
+  - intern
 
 skip_keywords:
   - manager
