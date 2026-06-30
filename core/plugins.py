@@ -1,5 +1,4 @@
 from core.interfaces import BaseSearchEngine, BaseJobParser, BaseApplyEngine
-from engines.search.fallback import FallbackSearch
 
 # Search Engines
 from engines.greenhouse.search import GreenhouseSearch
@@ -17,7 +16,6 @@ from engines.foundit.search import FounditSearch
 from engines.glassdoor.search import GlassdoorSearch
 
 # Parser Engines
-from engines.parser.job_parser import DefaultJobParser
 from engines.greenhouse.parser import GreenhouseJobParser
 from engines.lever.parser import LeverJobParser
 from engines.linkedin.parser import LinkedInJobParser
@@ -33,7 +31,6 @@ from engines.foundit.parser import FounditJobParser
 from engines.glassdoor.parser import GlassdoorJobParser
 
 # Apply Engines
-from engines.apply.universal import UniversalApply
 from engines.greenhouse.apply import GreenhouseApply
 from engines.lever.apply import LeverApply
 from engines.linkedin.apply import LinkedInApply
@@ -50,7 +47,6 @@ from engines.glassdoor.apply import GlassdoorApply
 
 # Plugin Registry
 SEARCH_ENGINES = {
-    "fallback": FallbackSearch,
     "greenhouse": GreenhouseSearch,
     "lever": LeverSearch,
     "linkedin": LinkedInSearch,
@@ -67,7 +63,6 @@ SEARCH_ENGINES = {
 }
 
 PARSER_ENGINES = {
-    "default": DefaultJobParser,
     "greenhouse": GreenhouseJobParser,
     "lever": LeverJobParser,
     "linkedin": LinkedInJobParser,
@@ -84,7 +79,6 @@ PARSER_ENGINES = {
 }
 
 APPLY_ENGINES = {
-    "universal": UniversalApply,
     "greenhouse": GreenhouseApply,
     "lever": LeverApply,
     "linkedin": LinkedInApply,

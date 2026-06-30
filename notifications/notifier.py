@@ -102,10 +102,10 @@ class Notifier:
         self._log_notification(msg)
         self._async_send(self.telegram.send, msg)
 
-    def notify_job_matched(self, score: int, resume: str, company: str, role: str):
+    def notify_job_matched(self, score: int, resume: str, company: str, role: str, reasoning: str = "", cover_letter_generated: bool = False):
         if not self.config["notifications"].get("on_match", False):
             return
-        msg = format_job_matched(score, resume, company, role)
+        msg = format_job_matched(score, resume, company, role, reasoning, cover_letter_generated)
         
         self._log_notification(msg)
         self._async_send(self.telegram.send, msg)

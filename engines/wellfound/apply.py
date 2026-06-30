@@ -1,7 +1,10 @@
 import time
 from loguru import logger
-from engines.apply.universal_engine import UniversalApplyEngine
+from core.base_engine import UniversalApplyEngine
 from core.models import Job
+from engines.wellfound.selectors import (
+    APPLY_BTN, ALREADY_APPLIED, NOTE_BOX, SUBMIT_MODAL, EXTERNAL_APPLY_BTN
+)
 
 class WellfoundApply(UniversalApplyEngine):
     def apply(self, job: Job, dry_run: bool = False, screenshot_cb=None) -> bool:
@@ -25,9 +28,17 @@ class WellfoundApply(UniversalApplyEngine):
                 job.failure_type = "LOGIN_REQUIRED"
                 return False
                 
-            apply_btn = self.page.locator("button:has-text('Apply'), button:has-text('Quick Apply'), [class*='applyButton']").first
+            apply_btn = self.page.locator(APPLY_BTN).first
             if apply_btn.count() == 0 or not apply_btn.is_visible():
-                already_applied = self.page.locator("button:has-text('Applied'), span:has-text('Applied')").count() > 0
+                # Check for external apply button / link
+                external_btn = self.page.locator(EXTERNAL_APPLY_BTN).first
+                if external_btn.count() > 0 and external_btn.is_visible():
+                    logger.info("WellfoundApply: External apply detected. Setting status to external_redirect.")
+                    job.status = "external_redirect"
+                    job.failure_type = "external_redirect"
+                    return False
+                    
+                already_applied = self.page.locator(ALREADY_APPLIED).count() > 0
                 if already_applied:
                     logger.info("WellfoundApply: Already applied. Skipping.")
                     return True
@@ -44,16 +55,15 @@ class WellfoundApply(UniversalApplyEngine):
             time.sleep(3)
             
             # Auto fill note/pitch if requested
-            note_box = self.page.locator("textarea[name='note'], textarea[placeholder*='pitch'], textarea[placeholder*='note']").first
+            note_box = self.page.locator(NOTE_BOX).first
             if note_box.count() > 0 and note_box.is_visible():
                 logger.info("WellfoundApply: Cover letter/pitch note box found. Filling...")
-                # We can write a generic pitch note from answers
                 pitch_text = "Hi, I am very interested in this software engineering position and believe my technical experience in backend, python, and full stack development aligns perfectly with your requirements."
                 note_box.fill(pitch_text)
                 time.sleep(1)
                 
             # Submit inside popup modal
-            submit_modal = self.page.locator("button:has-text('Send Application'), button:has-text('Submit')").first
+            submit_modal = self.page.locator(SUBMIT_MODAL).first
             if submit_modal.count() > 0 and submit_modal.is_visible():
                 submit_modal.click()
                 time.sleep(3)

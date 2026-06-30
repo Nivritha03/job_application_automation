@@ -1,0 +1,5 @@
+APPLY_BTN = "button[data-test='easy-apply-button'], button:has-text('Easy Apply'), button.easy-apply"
+ALREADY_APPLIED = "button:has-text('Applied'), span:has-text('Applied')"
+MODAL = ".modal-content, div[role='dialog']"
+SUBMIT_MODAL = "button:has-text('Submit'), button:has-text('Apply'), button:has-text('Continue')"
+EXTERNAL_APPLY_BTN = "button:has-text('Apply on company site'), button:has-text('Apply on Company Website'), button:has-text('Apply')"

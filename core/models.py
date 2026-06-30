@@ -30,6 +30,11 @@ class Job(BaseModel):
     failure_type: Optional[str] = None
     retry_after: Optional[datetime] = None
     platform: str = ""
+    ai_reasoning: Optional[str] = ""
+    ai_strengths: List[str] = Field(default_factory=list)
+    ai_missing_skills: List[str] = Field(default_factory=list)
+    cover_letter_generated: bool = False
+    filter_reason: Optional[str] = ""
     
 # -------------------------------------------------------------------
 # SQLAlchemy Models (Database Persistence)

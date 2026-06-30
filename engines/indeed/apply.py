@@ -1,7 +1,10 @@
 import time
 from loguru import logger
-from engines.apply.universal_engine import UniversalApplyEngine
+from core.base_engine import UniversalApplyEngine
 from core.models import Job
+from engines.indeed.selectors import (
+    APPLY_BTN, ALREADY_APPLIED, MODAL, NEXT_BTN, SUBMIT_BTN, EXTERNAL_APPLY_BTN
+)
 
 class IndeedApply(UniversalApplyEngine):
     def apply(self, job: Job, dry_run: bool = False, screenshot_cb=None) -> bool:
@@ -25,9 +28,17 @@ class IndeedApply(UniversalApplyEngine):
                 job.failure_type = "LOGIN_REQUIRED"
                 return False
                 
-            apply_btn = self.page.locator(".jobsearch-IndeedApplyButton-button, button:has-text('Indeed Apply'), #indeedApplyButton").first
+            apply_btn = self.page.locator(APPLY_BTN).first
             if apply_btn.count() == 0 or not apply_btn.is_visible():
-                already_applied = self.page.locator("button:has-text('Applied'), span:has-text('Applied')").count() > 0
+                # Check for external apply button / link
+                external_btn = self.page.locator(EXTERNAL_APPLY_BTN).first
+                if external_btn.count() > 0 or self.page.locator("button:has-text('Apply')").count() > 0:
+                    logger.info("IndeedApply: External apply detected. Setting status to external_redirect.")
+                    job.status = "external_redirect"
+                    job.failure_type = "external_redirect"
+                    return False
+                    
+                already_applied = self.page.locator(ALREADY_APPLIED).count() > 0
                 if already_applied:
                     logger.info("IndeedApply: Already applied. Skipping.")
                     return True
@@ -44,14 +55,13 @@ class IndeedApply(UniversalApplyEngine):
             time.sleep(3)
             
             # Check for iframe or modal popup dialogs
-            modal = self.page.locator("div.ia-Dialog, div.ia-Modal, div[role='dialog']").first
-            if modal.count() > 0 and modal.is_visible():
+            modal_elem = self.page.locator(MODAL).first
+            if modal_elem.count() > 0 and modal_elem.is_visible():
                 logger.info("IndeedApply: Quick apply modal detected. Completing steps...")
-                # Loop through next / continue steps
                 step_count = 1
                 while step_count <= 6:
-                    next_btn = modal.locator("button:has-text('Continue'), button:has-text('Next')").first
-                    submit_btn = modal.locator("button:has-text('Submit'), button:has-text('Apply')").first
+                    next_btn = modal_elem.locator(NEXT_BTN).first
+                    submit_btn = modal_elem.locator(SUBMIT_BTN).first
                     
                     if submit_btn.count() > 0 and submit_btn.is_visible():
                         submit_btn.click()

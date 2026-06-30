@@ -6,9 +6,9 @@ scheduler:
   delay_max: 180
 
 limits:
-  max_daily_applications: 15
-  max_hourly_applications: 3
-  max_applications_per_company: 2
+  max_daily_applications: 100
+  max_hourly_applications: 30
+  max_applications_per_company: 10
 
 search_keywords:
   - python
@@ -88,3 +88,12 @@ notifications:
   smtp_server: "smtp.gmail.com"
   smtp_port: 587
   smtp_username: ""
+
+ai:
+  enabled: true
+  provider: groq
+  model: llama-3.3-70b-versatile
+  api_key: ${GROQ_API_KEY}
+  temperature: 0.2
+  max_tokens: 1024
+  cache: true

@@ -26,7 +26,11 @@ class Pipeline:
         headless: bool = False,
         review_required: bool = False,
         resume_otp_only: bool = False,
-        global_search: bool = False
+        global_search: bool = False,
+        ai_enabled: bool = None,
+        groq_model: str = None,
+        temperature: float = None,
+        max_tokens: int = None
     ):
         self.site = site
         self.search_query = search_query
@@ -50,6 +54,51 @@ class Pipeline:
                 self.config = yaml.safe_load(f) or {}
         except Exception:
             self.config = {}
+
+        # AI Configuration Initialization
+        ai_cfg = self.config.get("ai", {})
+        if ai_enabled is not None:
+            self.ai_enabled = ai_enabled
+        else:
+            self.ai_enabled = ai_cfg.get("enabled", False)
+
+        if self.ai_enabled:
+            from ai.groq_client import GroqClient
+            from ai.cache import AICache
+            from ai.validator import AIValidator
+            from ai.analyzer import AIAnalyzer
+            from ai.resume_ranker import AIResumeRanker
+            from ai.cover_letter import AICoverLetterGenerator
+            from ai.question_answerer import AIQuestionAnswerer
+            from ai.recruiter_message import AIRecruiterMessageGenerator
+
+            self.groq_client = GroqClient(
+                model_override=groq_model,
+                temperature_override=temperature,
+                max_tokens_override=max_tokens
+            )
+            self.ai_cache = AICache(enabled=ai_cfg.get("cache", True))
+            self.ai_validator = AIValidator(self.groq_client)
+            self.ai_analyzer = AIAnalyzer(self.groq_client, self.ai_cache)
+            self.ai_resume_ranker = AIResumeRanker(self.groq_client, self.ai_cache)
+            self.ai_cover_letter = AICoverLetterGenerator(self.groq_client, self.ai_validator, self.ai_cache)
+            self.ai_question_answerer = AIQuestionAnswerer(self.groq_client, self.ai_validator, self.ai_cache)
+            self.ai_recruiter_message = AIRecruiterMessageGenerator(self.groq_client, self.ai_validator, self.ai_cache)
+
+            # Load candidate profiles and resumes configs for AI usage
+            try:
+                with open("config/answers.yaml", "r", encoding="utf-8") as f:
+                    self.candidate_profile = yaml.safe_load(f) or {}
+            except Exception:
+                self.candidate_profile = {}
+                
+            try:
+                with open("config/resumes.yaml", "r", encoding="utf-8") as f:
+                    self.resumes_config = yaml.safe_load(f) or {}
+            except Exception:
+                self.resumes_config = {}
+        else:
+            self.groq_client = None
 
         if not self.company and self.site and self.site != "all":
             if self.site == "greenhouse":
@@ -195,20 +244,32 @@ class Pipeline:
         failure_type = getattr(job, "failure_type", None)
         retry_after  = getattr(job, "retry_after", None)
         
-        app = DBApplication(
-            job_id=db_job.id,
-            resume_used=job.resume_used,
-            match_score=job.score,
-            applied=job.applied,
-            status=job.status,
-            error_message=job.error_message,
-            failure_type=failure_type,
-            screenshot_path=job.screenshot_path,
-            date_applied=date_applied,
-            retry_count=retry_count,
-            retry_after=retry_after
-        )
-        self.db.add(app)
+        if existing_app:
+            existing_app.resume_used = job.resume_used
+            existing_app.match_score = job.score
+            existing_app.applied = job.applied
+            existing_app.status = job.status
+            existing_app.error_message = job.error_message
+            existing_app.failure_type = failure_type
+            existing_app.screenshot_path = job.screenshot_path
+            existing_app.date_applied = date_applied
+            existing_app.retry_count = retry_count
+            existing_app.retry_after = retry_after
+        else:
+            app = DBApplication(
+                job_id=db_job.id,
+                resume_used=job.resume_used,
+                match_score=job.score,
+                applied=job.applied,
+                status=job.status,
+                error_message=job.error_message,
+                failure_type=failure_type,
+                screenshot_path=job.screenshot_path,
+                date_applied=date_applied,
+                retry_count=retry_count,
+                retry_after=retry_after
+            )
+            self.db.add(app)
         self.db.commit()
 
     def _save_html_snapshot(self, page, step: str, title: str) -> str:
@@ -339,6 +400,30 @@ class Pipeline:
                 apply_class = APPLY_ENGINES.get(db_job.site, APPLY_ENGINES["universal"])
                 apply_engine = apply_class(page)
                 
+                # Attach job and AI properties
+                apply_engine.job = job
+                apply_engine.ai_enabled = self.ai_enabled
+                if self.ai_enabled:
+                    apply_engine.ai_question_answerer = self.ai_question_answerer
+                    apply_engine.candidate_profile = self.candidate_profile
+                    apply_engine.resumes_config = self.resumes_config
+                    # Generate/Retrieve cover letter if enabled
+                    resume_text = self.ai_resume_ranker._extract_pdf_text(job.resume_used)
+                    cover_letter = self.ai_cover_letter.generate(
+                        job_title=job.title,
+                        company=job.company,
+                        job_description=job.description,
+                        resume_text=resume_text,
+                        profile_details=self.candidate_profile
+                    )
+                    if cover_letter:
+                        job.cover_letter = cover_letter
+                        job.cover_letter_generated = True
+                        if hasattr(apply_engine, "answers") and isinstance(apply_engine.answers, dict):
+                            apply_engine.answers["cover_letter"] = job.cover_letter
+                        if hasattr(apply_engine, "filler") and hasattr(apply_engine.filler, "answers") and isinstance(apply_engine.filler.answers, dict):
+                            apply_engine.filler.answers["cover_letter"] = job.cover_letter
+
                 start_time = time.time()
                 success = apply_engine.apply(job, dry_run=self.dry_run)
                 duration = time.time() - start_time
@@ -407,6 +492,14 @@ class Pipeline:
                 apply_class = APPLY_ENGINES.get(db_job.site, APPLY_ENGINES["universal"])
                 apply_engine = apply_class(page)
                 
+                # Attach job and AI properties
+                apply_engine.job = job
+                apply_engine.ai_enabled = self.ai_enabled
+                if self.ai_enabled:
+                    apply_engine.ai_question_answerer = self.ai_question_answerer
+                    apply_engine.candidate_profile = self.candidate_profile
+                    apply_engine.resumes_config = self.resumes_config
+                    
                 success = apply_engine.apply(job, dry_run=False)
                 if success:
                     app.applied = True
@@ -467,6 +560,22 @@ class Pipeline:
                 if not keywords:
                     keywords = ["engineer"]
 
+            ORDERED_PLATFORMS = [
+                "naukri",
+                "instahyre",
+                "wellfound",
+                "hirist",
+                "cutshort",
+                "indeed",
+                "foundit",
+                "glassdoor",
+                "linkedin",
+                "greenhouse",
+                "lever",
+                "ashby",
+                "workable"
+            ]
+            
             targets = []
             if self.site and self.site != "all":
                 if self.company:
@@ -476,7 +585,8 @@ class Pipeline:
                     for c in companies:
                         targets.append((self.site, c))
             else:
-                for platform, companies in self.config.get("boards", {}).items():
+                for platform in ORDERED_PLATFORMS:
+                    companies = self.config.get("boards", {}).get(platform, [])
                     for c in companies:
                         targets.append((platform, c))
                         
@@ -612,10 +722,16 @@ class Pipeline:
                     jobs = jobs[:self.limit]
                 self.jobs_found += len(jobs)
                 
-                parser_class = PARSER_ENGINES.get(platform, PARSER_ENGINES["default"])
+                parser_class = PARSER_ENGINES.get(platform)
+                if not parser_class:
+                    logger.error(f"Pipeline: Parser for platform '{platform}' not found. Skipping.")
+                    continue
                 parser = parser_class(page)
                 
-                apply_class = APPLY_ENGINES.get(platform, APPLY_ENGINES["universal"])
+                apply_class = APPLY_ENGINES.get(platform)
+                if not apply_class:
+                    logger.error(f"Pipeline: Apply engine for platform '{platform}' not found. Skipping.")
+                    continue
                 apply_engine = apply_class(page)
                 
                 for job in jobs:
@@ -630,17 +746,17 @@ class Pipeline:
                         if existing_app:
                             # 1. If it was already applied for real, skip it
                             if existing_app.applied or existing_app.status == "applied":
-                                logger.info(f"Pipeline: Skipping duplicate job '{job.title}' (Already applied)")
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Already applied")
                                 self.jobs_skipped += 1
                                 continue
                             # 2. If it was a dry-run and we are still doing dry-runs, skip it
                             if existing_app.status == "dry_run" and self.dry_run:
-                                logger.info(f"Pipeline: Skipping duplicate job '{job.title}' (Already dry-runned)")
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Already dry-runned")
                                 self.jobs_skipped += 1
                                 continue
                             # 3. If it is pending review and we are still in review mode, skip it
                             if existing_app.status == "pending_review" and self.review_required:
-                                logger.info(f"Pipeline: Skipping duplicate job '{job.title}' (Already pending review)")
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Already pending review")
                                 self.jobs_skipped += 1
                                 continue
                             
@@ -655,7 +771,7 @@ class Pipeline:
                     
                     max_company = self.config.get("limits", {}).get("max_applications_per_company", 2)
                     if company_applied >= max_company:
-                        logger.info(f"Pipeline: Skipping job at '{job.company}' - Daily company limit of {max_company} reached.")
+                        logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Daily company limit reached")
                         self.jobs_skipped += 1
                         job.status = "skipped"
                         self._save_job_state(job)
@@ -666,6 +782,18 @@ class Pipeline:
                         job = parser.extract_details(job)
                         job.screenshot_path = self._take_screenshot(page, "job", job.title)
                         
+                        if getattr(job, "status", "") == "external_redirect":
+                            logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
+                            self.jobs_skipped += 1
+                            self._save_job_state(job)
+                            continue
+                            
+                        if getattr(job, "status", "") == "no_auto_apply":
+                            logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
+                            self.jobs_skipped += 1
+                            self._save_job_state(job)
+                            continue
+                            
                         if job.error_message:
                             logger.error(f"Pipeline: Parsing failed for '{job.title}': {job.error_message}")
                             self.errors += 1
@@ -709,7 +837,7 @@ class Pipeline:
                                     is_location_mismatch = True
                                     
                         if is_location_mismatch:
-                            logger.info(f"Skipping job '{job.title}' - Location '{job.location}' mismatch.")
+                            logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Location mismatch")
                             self.jobs_skipped += 1
                             job.status = "skipped"
                             self._save_job_state(job)
@@ -717,6 +845,7 @@ class Pipeline:
                             
                         job = self.filter_engine.score_job(job)
                         if not job.would_apply:
+                            logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Keyword mismatch ({getattr(job, 'filter_reason', 'No match')})")
                             self.jobs_skipped += 1
                             job.status = "skipped"
                             self._save_job_state(job)
@@ -724,17 +853,85 @@ class Pipeline:
                             
                         self.jobs_eligible += 1
                         
-                        # Resume Selector
-                        if self.resume and self.resume.lower() != "auto":
-                            job.resume_used = self.resume
+                        # ── AI Flow ──────────────────────────────────────────
+                        if self.ai_enabled and self.groq_client and self.groq_client.client:
+                            # 1. AI Job Analyzer
+                            ai_analysis = self.ai_analyzer.analyze_job(
+                                job_title=job.title,
+                                company=job.company,
+                                job_description=job.description,
+                                job_skills=job.skills,
+                                job_requirements=job.requirements,
+                                candidate_profile=self.candidate_profile,
+                                resumes_data=self.resumes_config
+                            )
+                            
+                            job.score = ai_analysis.get("match_score", job.score)
+                            job.ai_reasoning = ai_analysis.get("reasoning", "")
+                            job.ai_strengths = ai_analysis.get("strengths", [])
+                            job.ai_missing_skills = ai_analysis.get("missing_skills", [])
+                            
+                            should_apply = ai_analysis.get("should_apply", True)
+                            if not should_apply:
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: AI match score {job.score} too low")
+                                self.jobs_skipped += 1
+                                job.status = "skipped"
+                                self._save_job_state(job)
+                                continue
+                                
+                            logger.info(f"Pipeline: AI approved job '{job.title}' (AI Match Score: {job.score})")
+                            
+                            # 2. AI Resume Selector / Ranker
+                            rank_result = self.ai_resume_ranker.rank_resumes(
+                                job_description=job.description,
+                                company=job.company,
+                                role=job.title
+                            )
+                            recommended_key = rank_result.get("resume", "general")
+                            job.resume_used = self.ai_resume_ranker.resolve_resume(recommended_key)
+                            logger.info(f"Pipeline: AI selected resume: {job.resume_used} (Reason: {rank_result.get('reason')})")
+                            
+                            # 3. Cover Letter Generation
+                            job.cover_letter_generated = False
+                            resume_text = self.ai_resume_ranker._extract_pdf_text(job.resume_used)
+                            cover_letter = self.ai_cover_letter.generate(
+                                job_title=job.title,
+                                company=job.company,
+                                job_description=job.description,
+                                resume_text=resume_text,
+                                profile_details=self.candidate_profile
+                            )
+                            if cover_letter:
+                                job.cover_letter = cover_letter
+                                job.cover_letter_generated = True
+                                logger.info("Pipeline: AI successfully generated a cover letter.")
                         else:
-                            job = self.resume_engine.select(job)
+                            # Resume Selector (Deterministic)
+                            if self.resume and self.resume.lower() != "auto":
+                                job.resume_used = self.resume
+                            else:
+                                job = self.resume_engine.select(job)
+                                
+                        # Attach job and AI properties to the apply engine
+                        apply_engine.job = job
+                        apply_engine.ai_enabled = self.ai_enabled
+                        if self.ai_enabled:
+                            apply_engine.ai_question_answerer = self.ai_question_answerer
+                            apply_engine.candidate_profile = self.candidate_profile
+                            apply_engine.resumes_config = self.resumes_config
+                            if job.cover_letter_generated and job.cover_letter:
+                                if hasattr(apply_engine, "answers") and isinstance(apply_engine.answers, dict):
+                                    apply_engine.answers["cover_letter"] = job.cover_letter
+                                if hasattr(apply_engine, "filler") and hasattr(apply_engine.filler, "answers") and isinstance(apply_engine.filler.answers, dict):
+                                    apply_engine.filler.answers["cover_letter"] = job.cover_letter
                             
                         self.telegram_notifier.notify_job_matched(
                             score=job.score,
                             resume=job.resume_used or "Resume.pdf",
                             company=job.company,
-                            role=job.title
+                            role=job.title,
+                            reasoning=getattr(job, "ai_reasoning", ""),
+                            cover_letter_generated=getattr(job, "cover_letter_generated", False)
                         )
                             
                         # Mimic human actions delay before applying
@@ -755,15 +952,45 @@ class Pipeline:
                         
                         if self.dry_run:
                             success = apply_engine.apply(job, dry_run=True, screenshot_cb=screenshot_cb)
+                            if getattr(job, "status", "") == "external_redirect":
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
+                                self.jobs_skipped += 1
+                                self._save_job_state(job)
+                                continue
+                            if getattr(job, "status", "") == "no_auto_apply":
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
+                                self.jobs_skipped += 1
+                                self._save_job_state(job)
+                                continue
                             job.status = "dry_run"
                         elif self.review_required:
                             # Run form filling only (Review Queue)
                             logger.info(f"Pipeline: Review Required flag active. Stalling submission for {job.title}.")
                             success = apply_engine.apply(job, dry_run=True, screenshot_cb=screenshot_cb)
+                            if getattr(job, "status", "") == "external_redirect":
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
+                                self.jobs_skipped += 1
+                                self._save_job_state(job)
+                                continue
+                            if getattr(job, "status", "") == "no_auto_apply":
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
+                                self.jobs_skipped += 1
+                                self._save_job_state(job)
+                                continue
                             job.status = "pending_review"
                             job.screenshot_path = self._take_screenshot(page, "before_submit", job.title)
                         else:
                             success = apply_engine.apply(job, dry_run=False, screenshot_cb=screenshot_cb)
+                            if getattr(job, "status", "") == "external_redirect":
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
+                                self.jobs_skipped += 1
+                                self._save_job_state(job)
+                                continue
+                            if getattr(job, "status", "") == "no_auto_apply":
+                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
+                                self.jobs_skipped += 1
+                                self._save_job_state(job)
+                                continue
                             duration = time.time() - start_time
                             
                             if success:

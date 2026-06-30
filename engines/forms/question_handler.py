@@ -22,7 +22,53 @@ class BaseQuestionHandler(ABC):
         # 3. Try free text
         if not ans:
             ans = self.parent._match_dict(label_lower, self.parent.free_text)
-        return ans
+            
+        # ── AI Fallback Form Assistant ──
+        engine = getattr(self.parent, "engine", None)
+        if not ans and engine and getattr(engine, "ai_enabled", False):
+            ai_qa = getattr(engine, "ai_question_answerer", None)
+            job = getattr(engine, "job", None)
+            if ai_qa and job:
+                resume_used = job.resume_used or "Resume.pdf"
+                resume_text = ""
+                try:
+                    from ai.resume_ranker import AIResumeRanker
+                    temp_ranker = AIResumeRanker(ai_qa.client, ai_qa.cache)
+                    resume_text = temp_ranker._extract_pdf_text(resume_used)
+                except Exception:
+                    pass
+                
+                logger.info(f"QuestionHandler AI: Fallback answering '{fg.label_raw}' using Groq...")
+                ans = ai_qa.answer_question(
+                    question=fg.label_raw or label_lower,
+                    field_type=fg.field_type,
+                    job_details=f"Title: {job.title}\nDescription: {job.description}",
+                    resume_text=resume_text,
+                    profile_details=getattr(engine, "candidate_profile", {}),
+                    company=job.company,
+                    role=job.title
+                )
+                
+                if ans == "REQUIRES_USER_INPUT" and fg.field_type not in ("checkbox", "radio"):
+                    html_context = f"name={fg.name_attr or ''} id={fg.id_attr or ''} placeholder={fg.placeholder or ''}"
+                    assistant_res = ai_qa.form_assistant_fallback(
+                        label=fg.label_raw or label_lower,
+                        placeholder=fg.placeholder or "",
+                        question=fg.label_raw or label_lower,
+                        html_context=html_context,
+                        job_description=job.description,
+                        resume_text=resume_text,
+                        profile_details=getattr(engine, "candidate_profile", {}),
+                        company=job.company,
+                        role=job.title
+                    )
+                    ans = assistant_res.get("answer", "REQUIRES_USER_INPUT")
+                    
+                if ans == "REQUIRES_USER_INPUT":
+                    logger.warning(f"QuestionHandler AI: Question '{fg.label_raw}' requires user input.")
+                    ans = ""
+                else:
+                    logger.info(f"QuestionHandler AI: Answer resolved: {ans[:60]!r}")
 
     def _answer_generic_field(self, label_lower: str, fg: FieldGroup, engine, answer_val: str) -> bool:
         """Generic input handling delegating to low-level engine operations."""
@@ -270,6 +316,7 @@ class QuestionHandler:
         category = QuestionClassifier.classify(label)
         handler = self.handlers.get(category, self.handlers["DEFAULT"])
         logger.debug(f"QuestionHandler: Classifying {label!r} -> Category: {category} (Handler: {handler.__class__.__name__})")
+        self.engine = engine
         return handler.answer(label, fg, engine)
 
     # ─── Matching Helpers ──────────────────────────────────────────────────────

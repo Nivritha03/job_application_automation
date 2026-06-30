@@ -1,7 +1,10 @@
 import time
 from loguru import logger
-from engines.apply.universal_engine import UniversalApplyEngine
+from core.base_engine import UniversalApplyEngine
 from core.models import Job
+from engines.instahyre.selectors import (
+    APPLY_BTN, ALREADY_APPLIED, MODAL, SUBMIT_MODAL, EXTERNAL_APPLY_BTN
+)
 
 class InstahyreApply(UniversalApplyEngine):
     def apply(self, job: Job, dry_run: bool = False, screenshot_cb=None) -> bool:
@@ -25,9 +28,17 @@ class InstahyreApply(UniversalApplyEngine):
                 job.failure_type = "LOGIN_REQUIRED"
                 return False
                 
-            apply_btn = self.page.locator("button.apply-btn, button.btn-apply, button:has-text('Apply')").first
+            apply_btn = self.page.locator(APPLY_BTN).first
             if apply_btn.count() == 0 or not apply_btn.is_visible():
-                already_applied = self.page.locator("button:has-text('Applied'), span:has-text('Applied')").count() > 0
+                # Check for external apply button / link
+                external_btn = self.page.locator(EXTERNAL_APPLY_BTN).first
+                if external_btn.count() > 0 and external_btn.is_visible():
+                    logger.info("InstahyreApply: External apply detected. Setting status to external_redirect.")
+                    job.status = "external_redirect"
+                    job.failure_type = "external_redirect"
+                    return False
+                    
+                already_applied = self.page.locator(ALREADY_APPLIED).count() > 0
                 if already_applied:
                     logger.info("InstahyreApply: Already applied. Skipping.")
                     return True
@@ -44,10 +55,10 @@ class InstahyreApply(UniversalApplyEngine):
             time.sleep(3)
             
             # Check for questionnaire / multi-step popups
-            modal = self.page.locator(".modal-dialog, div[role='dialog']").first
+            modal = self.page.locator(MODAL).first
             if modal.count() > 0 and modal.is_visible():
                 logger.info("InstahyreApply: Recruiter questionnaire detected inside modal.")
-                submit_modal = modal.locator("button:has-text('Submit'), button:has-text('Apply')").first
+                submit_modal = modal.locator(SUBMIT_MODAL).first
                 if submit_modal.count() > 0:
                     submit_modal.click()
                     time.sleep(2)

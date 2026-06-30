@@ -31,7 +31,11 @@ def run_scheduler(args):
             dry_run=args.dry_run,
             review_required=args.review,
             headless=True,
-            global_search=args.global_search
+            global_search=args.global_search,
+            ai_enabled=args.ai,
+            groq_model=args.groq_model,
+            temperature=args.temperature,
+            max_tokens=args.max_tokens
         )
         pipeline.run()
         
@@ -64,6 +68,14 @@ def main():
     parser.add_argument("--review", action="store_true", help="Enable human review queue before submission")
     parser.add_argument("--resume-otp", action="store_true", help="Resume applications currently stalled waiting for email verification codes")
     parser.add_argument("--test-telegram", action="store_true", help="Verify Telegram configuration and send a test message")
+    
+    # AI Assistant arguments
+    parser.add_argument("--ai", dest="ai", action="store_true", help="Enable Groq AI flow")
+    parser.add_argument("--no-ai", dest="ai", action="store_false", help="Disable Groq AI flow")
+    parser.set_defaults(ai=None)
+    parser.add_argument("--groq-model", type=str, default=None, help="Override Groq model")
+    parser.add_argument("--temperature", type=float, default=None, help="Override temperature")
+    parser.add_argument("--max-tokens", type=int, default=None, help="Override max tokens")
     
     args = parser.parse_args()
     
@@ -169,7 +181,11 @@ def main():
         headless=args.headless,
         review_required=args.review,
         resume_otp_only=args.resume_otp,
-        global_search=args.global_search
+        global_search=args.global_search,
+        ai_enabled=args.ai,
+        groq_model=args.groq_model,
+        temperature=args.temperature,
+        max_tokens=args.max_tokens
     )
     
     pipeline.run()

@@ -35,14 +35,18 @@ def format_job_found(company: str, role: str, platform: str, location: str) -> s
         f"📍 *Location:*\n{escape_markdown(location)}"
     )
 
-def format_job_matched(score: int, resume: str, company: str, role: str) -> str:
-    return (
+def format_job_matched(score: int, resume: str, company: str, role: str, reasoning: str = "", cover_letter_generated: bool = False) -> str:
+    msg = (
         f"📈 *Job Matched*\n\n"
         f"📊 *Score:*\n{escape_markdown(str(score))}\n\n"
         f"📄 *Resume:*\n{escape_markdown(resume)}\n\n"
         f"🏢 *Company:*\n{escape_markdown(company)}\n\n"
         f"💼 *Role:*\n{escape_markdown(role)}"
     )
+    if reasoning:
+        msg += f"\n\n🧠 *AI Reasoning:*\n{escape_markdown(reasoning)}"
+    msg += f"\n\n✍️ *Cover Letter Generated:*\n{escape_markdown('Yes' if cover_letter_generated else 'No')}"
+    return msg
 
 def format_apply_success(company: str, role: str, platform: str, location: str, resume: str, time_str: str, url: str, score: int, app_id: str = None) -> str:
     app_id_str = escape_markdown(app_id or "N/A")

@@ -1,0 +1,6 @@
+APPLY_BTN = ".jobsearch-IndeedApplyButton-button, button:has-text('Indeed Apply'), #indeedApplyButton"
+ALREADY_APPLIED = "button:has-text('Applied'), span:has-text('Applied')"
+MODAL = "div.ia-Dialog, div.ia-Modal, div[role='dialog']"
+NEXT_BTN = "button:has-text('Continue'), button:has-text('Next')"
+SUBMIT_BTN = "button:has-text('Submit'), button:has-text('Apply')"
+EXTERNAL_APPLY_BTN = "a[href*='company'], button:has-text('Apply on company site'), button:has-text('Apply on Company Website'), button:has-text('Apply')"

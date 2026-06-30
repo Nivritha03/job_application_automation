@@ -1,0 +1,6 @@
+MODAL = "dialog, div.jobs-easy-apply-modal, div[role='dialog'], [class*='easy-apply-modal']"
+NEXT_BTN = "button:has-text('Next'), button:has-text('Continue'), button:has-text('Review')"
+SUBMIT_BTN = "button:has-text('Submit'), button[aria-label*='Submit']"
+DISMISS_BTN = "button[aria-label*='Dismiss'], button[aria-label*='Close'], button[class*='modal__dismiss']"
+DISCARD_BTN = "button[data-control-name='discard_application_confirm_btn'], button:has-text('Discard')"
+EXTERNAL_APPLY_BTN = "button:has-text('Apply')"

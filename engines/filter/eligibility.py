@@ -98,6 +98,7 @@ class EligibilityFilter:
             
         job.would_apply = would_apply
         job.score = 100 if would_apply else (-50 if (matched_skip or matched_neg_tech) else 0)
+        job.filter_reason = reason
         
         # Log beautiful breakdown
         logger.info("\n" + "="*60)

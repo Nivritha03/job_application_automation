@@ -1,0 +1,5 @@
+APPLY_BTN = "button:has-text('Apply'), button:has-text('Quick Apply'), [class*='applyButton']"
+ALREADY_APPLIED = "button:has-text('Applied'), span:has-text('Applied')"
+NOTE_BOX = "textarea[name='note'], textarea[placeholder*='pitch'], textarea[placeholder*='note']"
+SUBMIT_MODAL = "button:has-text('Send Application'), button:has-text('Submit')"
+EXTERNAL_APPLY_BTN = "button:has-text('Apply on company site'), button:has-text('Apply on Company Website'), button:has-text('Apply')"

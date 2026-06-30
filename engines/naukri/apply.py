@@ -1,7 +1,10 @@
 import time
 from loguru import logger
-from engines.apply.universal_engine import UniversalApplyEngine
+from core.base_engine import UniversalApplyEngine
 from core.models import Job
+from engines.naukri.selectors import (
+    APPLY_BTN, ALREADY_APPLIED, POPUP, SUBMIT_POPUP, EXTERNAL_APPLY_BTN
+)
 
 class NaukriApply(UniversalApplyEngine):
     def apply(self, job: Job, dry_run: bool = False, screenshot_cb=None) -> bool:
@@ -25,10 +28,18 @@ class NaukriApply(UniversalApplyEngine):
                 job.failure_type = "LOGIN_REQUIRED"
                 return False
                 
-            apply_btn = self.page.locator("button.apply-button, button.apply, #apply-button").first
+            apply_btn = self.page.locator(APPLY_BTN).first
             if apply_btn.count() == 0 or not apply_btn.is_visible():
+                # Check for external apply button / link
+                external_btn = self.page.locator(EXTERNAL_APPLY_BTN).first
+                if external_btn.count() > 0 and external_btn.is_visible():
+                    logger.info("NaukriApply: External apply detected. Setting status to external_redirect.")
+                    job.status = "external_redirect"
+                    job.failure_type = "external_redirect"
+                    return False
+                    
                 # Already applied check
-                already_applied = self.page.locator("button:has-text('Applied'), span:has-text('Applied')").count() > 0
+                already_applied = self.page.locator(ALREADY_APPLIED).count() > 0
                 if already_applied:
                     logger.info("NaukriApply: Job already applied. Skipping.")
                     return True
@@ -45,11 +56,11 @@ class NaukriApply(UniversalApplyEngine):
             time.sleep(3)
             
             # Check for multi-step / questions popups
-            popup = self.page.locator("div.apply-modal, div[role='dialog']").first
+            popup = self.page.locator(POPUP).first
             if popup.count() > 0 and popup.is_visible():
                 logger.info("NaukriApply: Custom recruiter questionnaire detected. Filling fields...")
                 # Auto click standard check boxes / buttons
-                submit_popup = popup.locator("button:has-text('Submit'), button:has-text('Apply')").first
+                submit_popup = popup.locator(SUBMIT_POPUP).first
                 if submit_popup.count() > 0:
                     submit_popup.click()
                     time.sleep(2.5)

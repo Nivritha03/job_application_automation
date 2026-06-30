@@ -1,0 +1,5 @@
+APPLY_BTN = "button.apply-btn, button:has-text('Apply'), [class*='applyButton']"
+ALREADY_APPLIED = "button:has-text('Applied'), span:has-text('Applied')"
+CHAT_INPUT = "textarea[placeholder*='message'], textarea[placeholder*='type'], [id*='chat-textarea']"
+SEND_BTN = "button:has-text('Send'), button[class*='send']"
+EXTERNAL_APPLY_BTN = "button:has-text('Apply on company site'), button:has-text('Apply on Company Website'), button:has-text('Apply')"

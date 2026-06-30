@@ -2,11 +2,14 @@ import os
 import yaml
 import time
 from loguru import logger
-from engines.apply.universal_engine import UniversalApplyEngine
+from core.base_engine import UniversalApplyEngine
 from core.models import Job
 from engines.forms.detector import FormDetector, FieldGroup
 from engines.forms.mapper import FormMapper
 from engines.forms.question_handler import QuestionHandler
+from engines.linkedin.selectors import (
+    MODAL, NEXT_BTN, SUBMIT_BTN, DISMISS_BTN, DISCARD_BTN, EXTERNAL_APPLY_BTN
+)
 
 class LinkedInApply(UniversalApplyEngine):
     def __init__(self, page):
@@ -39,7 +42,7 @@ class LinkedInApply(UniversalApplyEngine):
                 pass
             time.sleep(2)
             
-            # Check login page redirect
+            # Check login redirect
             if "login" in self.page.url or "signin" in self.page.url:
                 logger.error("LinkedInApply: User is not authenticated. Aborting application.")
                 job.failure_type = "LOGIN_REQUIRED"
@@ -56,13 +59,21 @@ class LinkedInApply(UniversalApplyEngine):
                     pass
                     
             if not easy_apply_btn:
+                # Check for external apply button / link
+                external_btn = self.page.locator(EXTERNAL_APPLY_BTN).first
+                if external_btn.count() > 0 and external_btn.is_visible():
+                    logger.info("LinkedInApply: External apply button detected. Setting status to external_redirect.")
+                    job.status = "external_redirect"
+                    job.failure_type = "external_redirect"
+                    return False
+                    
                 logger.warning("LinkedInApply: Easy Apply button is not visible or enabled. Skipping.")
                 job.failure_type = "APPLICATION_CLOSED"
                 return False
                 
             self.take_screenshot("before_fill", job.title)
             
-            modal_selector = "dialog, div.jobs-easy-apply-modal, div[role='dialog'], [class*='easy-apply-modal']"
+            modal_selector = MODAL
             clicked_successfully = False
             for attempt in range(3):
                 try:
@@ -114,7 +125,6 @@ class LinkedInApply(UniversalApplyEngine):
                     return False
 
                 # Scan inputs inside modal only
-                # We instantiate a temporary detector on the modal element to be scoped
                 modal_detector = FormDetector(modal)
                 field_groups = modal_detector.find_fields()
                 profile_fields, questions = self.mapper.map_fields(field_groups)
@@ -135,8 +145,8 @@ class LinkedInApply(UniversalApplyEngine):
                 self.take_screenshot(f"fill_step_{step_count}", job.title)
 
                 # Locate next step or submit button
-                next_btn = modal.locator("button:has-text('Next'), button:has-text('Continue'), button:has-text('Review')").first
-                submit_btn = modal.locator("button:has-text('Submit'), button[aria-label*='Submit']").first
+                next_btn = modal.locator(NEXT_BTN).first
+                submit_btn = modal.locator(SUBMIT_BTN).first
 
                 if submit_btn.count() > 0 and submit_btn.is_visible():
                     if not dry_run:
@@ -239,12 +249,12 @@ class LinkedInApply(UniversalApplyEngine):
     def _dismiss_modal(self):
         try:
             logger.info("LinkedInApply: Dismissing modal dialog.")
-            dismiss_btn = self.page.locator("button[aria-label*='Dismiss'], button[aria-label*='Close'], button[class*='modal__dismiss']").first
+            dismiss_btn = self.page.locator(DISMISS_BTN).first
             if dismiss_btn.count() > 0:
                 dismiss_btn.click()
                 time.sleep(1.0)
                 # Confirm discard if prompted
-                discard_btn = self.page.locator("button[data-control-name='discard_application_confirm_btn'], button:has-text('Discard')").first
+                discard_btn = self.page.locator(DISCARD_BTN).first
                 if discard_btn.count() > 0:
                     discard_btn.click()
                     time.sleep(1.0)

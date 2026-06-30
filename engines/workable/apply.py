@@ -2,7 +2,7 @@ import os
 import yaml
 import time
 from loguru import logger
-from engines.apply.universal_engine import UniversalApplyEngine
+from core.base_engine import UniversalApplyEngine
 from core.models import Job
 from engines.forms.detector import FormDetector, FieldGroup
 from engines.forms.mapper import FormMapper
