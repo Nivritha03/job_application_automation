@@ -7,12 +7,12 @@ class AICoverLetterGenerator:
         self.validator = validator
         self.cache = cache
 
-    def generate(self, job_title: str, company: str, job_description: str, resume_text: str, profile_details: dict) -> str:
+    def generate(self, job_title: str, company: str, job_description: str, resume_text: str, profile_details: dict) -> tuple[str, int]:
         # Check cache
         if self.client.cache_enabled:
             cached = self.cache.get(company, job_title, "cover_letter", "resume")
             if cached:
-                return cached.get("text", "")
+                return cached.get("text", ""), 1
 
         # Format prompt
         prompt = COVER_LETTER_PROMPT.format(
@@ -25,7 +25,9 @@ class AICoverLetterGenerator:
 
         try:
             # Generate cover letter (maximum 3 attempts if validation fails)
+            attempts = 0
             for attempt in range(3):
+                attempts += 1
                 logger.info(f"AICoverLetterGenerator: Generating cover letter (attempt {attempt + 1})...")
                 cover_letter_text = self.client.call_groq(prompt)
                 
@@ -43,12 +45,12 @@ class AICoverLetterGenerator:
                     # Save to cache
                     if self.client.cache_enabled:
                         self.cache.set(company, job_title, "cover_letter", "resume", {"text": cover_letter_text})
-                    return cover_letter_text
+                    return cover_letter_text, attempts
                     
                 logger.warning("AICoverLetterGenerator: Cover letter failed fact validation. Retrying generation...")
 
             logger.error("AICoverLetterGenerator: Failed to generate a valid, factual cover letter after 3 attempts.")
-            return ""
+            return "", attempts
         except Exception as e:
             logger.error(f"AICoverLetterGenerator: Cover letter generation failed: {e}")
-            return ""
+            return "", 1

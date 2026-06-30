@@ -69,6 +69,7 @@ class BaseQuestionHandler(ABC):
                     ans = ""
                 else:
                     logger.info(f"QuestionHandler AI: Answer resolved: {ans[:60]!r}")
+        return ans
 
     def _answer_generic_field(self, label_lower: str, fg: FieldGroup, engine, answer_val: str) -> bool:
         """Generic input handling delegating to low-level engine operations."""

@@ -71,9 +71,10 @@ CANDIDATE PROFILE:
 
 INSTRUCTIONS:
 1. The cover letter MUST be between 250 and 300 words.
-2. DO NOT invent or fabricate any experience, projects, skills, education, certifications, or past employers.
-3. Use ONLY facts directly supported by the candidate's selected resume content and candidate profile.
-4. Return the plain text cover letter content only. Do NOT add markdown blocks or metadata.
+2. DO NOT invent or fabricate any experience, projects, internships, skills, education, certifications, or past employers.
+3. CRITICAL: Never invent experiences, never invent projects, never invent internships, never invent skills, never invent certifications. Only use facts directly supported by the candidate's selected resume content.
+4. Use ONLY facts directly supported by the candidate's selected resume content and candidate profile.
+5. Return the plain text cover letter content only. Do NOT add markdown blocks or metadata.
 """
 
 # 4. Question Answerer Prompt
@@ -169,10 +170,10 @@ CANDIDATE PROFILE:
 {profile_text}
 
 Identify if the generated response invents, fabricates, or exaggerates any:
-1. Employer/company names not in the candidate details.
+1. Past employer/company names not in the candidate details. NOTE: References to the target company being applied to (the employer this cover letter is for) are completely valid and expected. Do NOT mark references to the target company as fabrications or errors.
 2. Education, schools, GPAs, graduation dates.
 3. Certifications, licenses, or specific skills.
-4. Experience years or projects.
+4. Experience years, internships, or projects.
 
 Return a STRICT JSON response only.
 Response structure:

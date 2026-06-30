@@ -226,11 +226,17 @@ class Pipeline:
                 apply_url=job.url,
                 search_keyword=self.search_query,
                 job_hash=job_hash,
-                date_found=datetime.datetime.utcnow()
+                date_found=datetime.datetime.utcnow(),
+                country=job.country,
+                is_remote=job.is_remote
             )
             self.db.add(db_job)
             self.db.commit()
             self.db.refresh(db_job)
+        else:
+            db_job.country = job.country
+            db_job.is_remote = job.is_remote
+            self.db.commit()
             
         # Check retry count
         retry_count = 0
@@ -255,6 +261,10 @@ class Pipeline:
             existing_app.date_applied = date_applied
             existing_app.retry_count = retry_count
             existing_app.retry_after = retry_after
+            existing_app.skip_reason = job.skip_reason
+            existing_app.validation_error = job.validation_error
+            existing_app.ai_attempts = job.ai_attempts
+            existing_app.company_reply = job.company_reply
         else:
             app = DBApplication(
                 job_id=db_job.id,
@@ -267,7 +277,11 @@ class Pipeline:
                 screenshot_path=job.screenshot_path,
                 date_applied=date_applied,
                 retry_count=retry_count,
-                retry_after=retry_after
+                retry_after=retry_after,
+                skip_reason=job.skip_reason,
+                validation_error=job.validation_error,
+                ai_attempts=job.ai_attempts,
+                company_reply=job.company_reply
             )
             self.db.add(app)
         self.db.commit()
@@ -746,18 +760,27 @@ class Pipeline:
                         if existing_app:
                             # 1. If it was already applied for real, skip it
                             if existing_app.applied or existing_app.status == "applied":
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Already applied")
+                                logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: Already applied")
                                 self.jobs_skipped += 1
+                                job.status = "skipped"
+                                job.skip_reason = "Already applied"
+                                self._save_job_state(job)
                                 continue
                             # 2. If it was a dry-run and we are still doing dry-runs, skip it
                             if existing_app.status == "dry_run" and self.dry_run:
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Already dry-runned")
+                                logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: Already dry-runned")
                                 self.jobs_skipped += 1
+                                job.status = "skipped"
+                                job.skip_reason = "Already dry-runned"
+                                self._save_job_state(job)
                                 continue
                             # 3. If it is pending review and we are still in review mode, skip it
                             if existing_app.status == "pending_review" and self.review_required:
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Already pending review")
+                                logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: Already pending review")
                                 self.jobs_skipped += 1
+                                job.status = "skipped"
+                                job.skip_reason = "Already pending review"
+                                self._save_job_state(job)
                                 continue
                             
                     # ── Company daily limits check ──────────────────────────
@@ -771,9 +794,10 @@ class Pipeline:
                     
                     max_company = self.config.get("limits", {}).get("max_applications_per_company", 2)
                     if company_applied >= max_company:
-                        logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Daily company limit reached")
+                        logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: Daily company limit reached")
                         self.jobs_skipped += 1
                         job.status = "skipped"
+                        job.skip_reason = "Daily company limit reached"
                         self._save_job_state(job)
                         continue
                         
@@ -805,41 +829,73 @@ class Pipeline:
                             self.db.commit()
                             continue
                         
-                        # Filter
+                        # Location Classification & Filter
                         is_location_mismatch = False
-                        if self.location:
-                            loc_query = self.location.lower().strip()
-                            job_loc = job.location.lower().strip()
-                            if loc_query == "india":
-                                INDIA_LOCATIONS = [
-                                    "india",
-                                    "bangalore",
-                                    "bengaluru",
-                                    "hyderabad",
-                                    "pune",
-                                    "chennai",
-                                    "mumbai",
-                                    "gurgaon",
-                                    "gurugram",
-                                    "noida",
-                                    "delhi",
-                                    "kolkata",
-                                    "ahmedabad",
-                                    "remote - india",
-                                ]
-                                # Allow remote, wfh, anywhere, or empty locations to bypass strict location filters
-                                if job_loc == "" or any(term in job_loc for term in ["remote", "anywhere", "wfh", "work from home"]):
-                                    is_location_mismatch = False
-                                elif not any(l_token in job_loc for l_token in INDIA_LOCATIONS):
-                                    is_location_mismatch = True
+                        skip_reason = ""
+                        
+                        job_loc = job.location.lower().strip()
+                        
+                        # ACCEPT locations:
+                        ACCEPT_KEYWORDS = [
+                            "india", "bangalore", "bengaluru", "hyderabad", "pune", "chennai", 
+                            "mumbai", "gurgaon", "gurugram", "noida", "delhi", "kolkata", 
+                            "ahmedabad", "remote - india", "india remote",
+                            "remote", "worldwide", "global", "anywhere", "wfh", "work from home"
+                        ]
+                        
+                        # REJECT locations:
+                        REJECT_KEYWORDS = [
+                            "united states", "us", "u.s.", "uk", "united kingdom", "london", 
+                            "canada", "germany", "singapore", "europe", "ontario", "toronto",
+                            "australia", "vancouver", "amsterdam", "netherlands", "france"
+                        ]
+                        
+                        # Set is_remote in the job object
+                        job.is_remote = any(term in job_loc for term in ["remote", "anywhere", "wfh", "work from home"])
+                        
+                        # Classify country
+                        if "india" in job_loc or any(city in job_loc for city in ["bangalore", "bengaluru", "hyderabad", "pune", "chennai", "mumbai", "delhi", "noida", "gurgaon"]):
+                            job.country = "India"
+                        elif "united states" in job_loc or " u.s." in job_loc or job_loc.endswith(" us") or "usa" in job_loc:
+                            job.country = "United States"
+                        elif "canada" in job_loc:
+                            job.country = "Canada"
+                        elif "united kingdom" in job_loc or "uk" in job_loc or "london" in job_loc:
+                            job.country = "United Kingdom"
+                        elif "germany" in job_loc:
+                            job.country = "Germany"
+                        elif "singapore" in job_loc:
+                            job.country = "Singapore"
+                        else:
+                            job.country = "Global/Unknown"
+                            
+                        # Perform strict filtering if self.location is "India" (the default or custom filter)
+                        if self.location and self.location.lower() == "india":
+                            # If job explicitly mentions reject locations (e.g. US, UK, Canada, Europe) 
+                            # AND does not mention India locations, it is a mismatch (Remote US only, Canada only, etc.)
+                            has_reject = any(r_token in job_loc for r_token in REJECT_KEYWORDS)
+                            has_accept = any(a_token in job_loc for a_token in ["india", "bangalore", "bengaluru", "hyderabad", "pune", "chennai", "mumbai", "delhi", "noida", "gurgaon"])
+                            
+                            if has_reject and not has_accept:
+                                is_location_mismatch = True
+                                if "united states" in job_loc or "us" in job_loc or "u.s." in job_loc:
+                                    skip_reason = "Remote US only"
+                                else:
+                                    skip_reason = f"Remote {job.country} only"
                             else:
-                                if job_loc != "" and loc_query not in job_loc and not any(term in job_loc for term in ["remote", "anywhere"]):
-                                    is_location_mismatch = True
-                                    
+                                # Standard check if not a general remote or empty
+                                if job_loc != "" and not any(term in job_loc for term in ["remote", "anywhere", "wfh", "work from home"]):
+                                    # Strict physical check
+                                    INDIA_CITIES = ["india", "bangalore", "bengaluru", "hyderabad", "pune", "chennai", "mumbai", "gurgaon", "gurugram", "noida", "delhi", "kolkata", "ahmedabad"]
+                                    if not any(city in job_loc for city in INDIA_CITIES):
+                                        is_location_mismatch = True
+                                        skip_reason = "Location mismatch"
+                                        
                         if is_location_mismatch:
-                            logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Location mismatch")
+                            logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: {skip_reason}")
                             self.jobs_skipped += 1
                             job.status = "skipped"
+                            job.skip_reason = skip_reason
                             self._save_job_state(job)
                             continue
                             
@@ -873,9 +929,10 @@ class Pipeline:
                             
                             should_apply = ai_analysis.get("should_apply", True)
                             if not should_apply:
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: AI match score {job.score} too low")
+                                logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: AI score below threshold")
                                 self.jobs_skipped += 1
                                 job.status = "skipped"
+                                job.skip_reason = "AI score below threshold"
                                 self._save_job_state(job)
                                 continue
                                 
@@ -894,17 +951,26 @@ class Pipeline:
                             # 3. Cover Letter Generation
                             job.cover_letter_generated = False
                             resume_text = self.ai_resume_ranker._extract_pdf_text(job.resume_used)
-                            cover_letter = self.ai_cover_letter.generate(
+                            cover_letter, attempts = self.ai_cover_letter.generate(
                                 job_title=job.title,
                                 company=job.company,
                                 job_description=job.description,
                                 resume_text=resume_text,
                                 profile_details=self.candidate_profile
                             )
+                            job.ai_attempts = attempts
                             if cover_letter:
                                 job.cover_letter = cover_letter
                                 job.cover_letter_generated = True
-                                logger.info("Pipeline: AI successfully generated a cover letter.")
+                                logger.info(f"Pipeline: AI successfully generated a cover letter (Attempts: {attempts}).")
+                            else:
+                                logger.warning(f"Pipeline: SKIPPED '{job.title}' - Reason: Validation failed")
+                                self.jobs_skipped += 1
+                                job.status = "skipped"
+                                job.skip_reason = "Validation failed"
+                                job.validation_error = "Cover letter failed strict compliance verification after 3 attempts."
+                                self._save_job_state(job)
+                                continue
                         else:
                             # Resume Selector (Deterministic)
                             if self.resume and self.resume.lower() != "auto":
@@ -947,52 +1013,80 @@ class Pipeline:
                         def screenshot_cb(step: str):
                             self._take_screenshot(page, step, job.title)
                             
+                        # Smart structured log output
+                        import os
+                        resume_display = os.path.basename(job.resume_used) if job.resume_used else "None"
+                        logger.info(f"\n"
+                                    f"============================================================\n"
+                                    f"[{platform.upper()}]\n"
+                                    f"Company: {job.company}\n"
+                                    f"Role:    {job.title}\n"
+                                    f"Score:   {job.score}\n"
+                                    f"Resume:  {resume_display}\n"
+                                    f"Status:  {'Dry-running...' if self.dry_run else 'Applying...'}\n"
+                                    f"============================================================")
+                                    
                         # Apply Execution phase
                         start_time = time.time()
                         
+                        def execute_apply():
+                            if self.dry_run:
+                                return apply_engine.apply(job, dry_run=True, screenshot_cb=screenshot_cb)
+                            elif self.review_required:
+                                return apply_engine.apply(job, dry_run=True, screenshot_cb=screenshot_cb)
+                            else:
+                                return apply_engine.apply(job, dry_run=False, screenshot_cb=screenshot_cb)
+                                
+                        success = False
+                        try:
+                            success = execute_apply()
+                        except Exception as apply_err:
+                            logger.warning(f"Pipeline: Application attempt 1 failed: {apply_err}. Refreshing and retrying once...")
+                            try:
+                                self._take_screenshot(page, "attempt1_error", job.title)
+                                page.reload()
+                                page.wait_for_load_state("networkidle", timeout=10000)
+                                time.sleep(3)
+                                success = execute_apply()
+                            except Exception as retry_err:
+                                logger.error(f"Pipeline: Application retry attempt 2 failed: {retry_err}")
+                                success = False
+                                job.error_message = f"Timeout/Error: {retry_err}"
+                                
+                        if not success and getattr(job, "status", "") not in ("external_redirect", "no_auto_apply", "dry_run", "pending_review", "skipped"):
+                            logger.warning("Pipeline: Application attempt 1 returned False. Refreshing and retrying once...")
+                            try:
+                                self._take_screenshot(page, "attempt1_failed", job.title)
+                                page.reload()
+                                page.wait_for_load_state("networkidle", timeout=10000)
+                                time.sleep(3)
+                                success = execute_apply()
+                            except Exception as retry_err:
+                                logger.error(f"Pipeline: Application retry attempt 2 failed: {retry_err}")
+                                success = False
+                                
+                        if getattr(job, "status", "") == "external_redirect":
+                            logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: External redirect")
+                            self.jobs_skipped += 1
+                            job.status = "skipped"
+                            job.skip_reason = "External redirect"
+                            self._save_job_state(job)
+                            continue
+                        if getattr(job, "status", "") == "no_auto_apply":
+                            logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: Platform does not support auto-apply")
+                            self.jobs_skipped += 1
+                            job.status = "skipped"
+                            job.skip_reason = "Platform does not support auto-apply"
+                            self._save_job_state(job)
+                            continue
+                            
                         if self.dry_run:
-                            success = apply_engine.apply(job, dry_run=True, screenshot_cb=screenshot_cb)
-                            if getattr(job, "status", "") == "external_redirect":
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
-                                self.jobs_skipped += 1
-                                self._save_job_state(job)
-                                continue
-                            if getattr(job, "status", "") == "no_auto_apply":
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
-                                self.jobs_skipped += 1
-                                self._save_job_state(job)
-                                continue
                             job.status = "dry_run"
                         elif self.review_required:
-                            # Run form filling only (Review Queue)
-                            logger.info(f"Pipeline: Review Required flag active. Stalling submission for {job.title}.")
-                            success = apply_engine.apply(job, dry_run=True, screenshot_cb=screenshot_cb)
-                            if getattr(job, "status", "") == "external_redirect":
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
-                                self.jobs_skipped += 1
-                                self._save_job_state(job)
-                                continue
-                            if getattr(job, "status", "") == "no_auto_apply":
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
-                                self.jobs_skipped += 1
-                                self._save_job_state(job)
-                                continue
                             job.status = "pending_review"
                             job.screenshot_path = self._take_screenshot(page, "before_submit", job.title)
                         else:
-                            success = apply_engine.apply(job, dry_run=False, screenshot_cb=screenshot_cb)
-                            if getattr(job, "status", "") == "external_redirect":
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
-                                self.jobs_skipped += 1
-                                self._save_job_state(job)
-                                continue
-                            if getattr(job, "status", "") == "no_auto_apply":
-                                logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
-                                self.jobs_skipped += 1
-                                self._save_job_state(job)
-                                continue
                             duration = time.time() - start_time
-                            
                             if success:
                                 self.jobs_applied += 1
                                 job.applied = True
@@ -1040,7 +1134,6 @@ class Pipeline:
                                     job.retry_after = datetime.utcnow() + timedelta(hours=1)
                                     logger.warning(f"Pipeline: Application failed with {failure_type}. Added to retry queue.")
                                     
-                                    # Calculate retry attempt number
                                     retry_attempt = 1
                                     try:
                                         db_j = self.db.query(DBJob).filter(DBJob.external_job_id == job.id).first()

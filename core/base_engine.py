@@ -43,6 +43,10 @@ class UniversalApplyEngine(ABC):
     def fill_text(self, fg: FieldGroup, value: str):
         """Standard text input filling using sequential typing to trigger change events."""
         try:
+            # Check if this is a phone field
+            is_phone = fg.field_type == "tel" or any(p in (fg.label or "").lower() for p in ["phone", "mobile", "telephone", "cell", "tel"])
+            if is_phone:
+                value = self._normalize_phone(fg, value)
             logger.info(f"UniversalEngine: fill_text label={fg.label_raw!r} value={value[:60]!r}")
             fg.locator.scroll_into_view_if_needed()
             fg.locator.click(timeout=3000, force=True)
@@ -51,6 +55,56 @@ class UniversalApplyEngine(ABC):
         except Exception as e:
             logger.error(f"UniversalEngine: Failed fill_text on '{fg.label_raw}': {e}")
             raise e
+
+    def _normalize_phone(self, fg: FieldGroup, value: str) -> str:
+        # Strip all non-digit characters except maybe '+'
+        cleaned = "".join([c for c in value if c.isdigit() or c == '+'])
+        
+        # Determine format based on field constraints
+        max_len = None
+        try:
+            max_len_attr = fg.locator.get_attribute("maxlength")
+            if max_len_attr:
+                max_len = int(max_len_attr)
+        except Exception:
+            pass
+            
+        # Get 10-digit raw number
+        raw_10 = cleaned
+        if cleaned.startswith("+91"):
+            raw_10 = cleaned[3:]
+        elif cleaned.startswith("91") and len(cleaned) == 12:
+            raw_10 = cleaned[2:]
+            
+        if max_len == 10:
+            logger.info(f"Phone normalization: Max length is 10. Normalizing to 10-digit raw: {raw_10}")
+            return raw_10
+            
+        # Check placeholder or label constraints
+        placeholder = (fg.placeholder or "").lower()
+        label = (fg.label or "").lower()
+        
+        if "10 digit" in placeholder or "10-digit" in placeholder or "10 digit" in label:
+            logger.info(f"Phone normalization: Placeholder/label specifies 10 digits. Normalizing: {raw_10}")
+            return raw_10
+            
+        if "country code" in label or "country code" in placeholder:
+            logger.info(f"Phone normalization: Country code requested. Normalizing: {cleaned}")
+            return cleaned
+            
+        pattern = ""
+        try:
+            pattern = fg.locator.get_attribute("pattern") or ""
+        except Exception:
+            pass
+            
+        if pattern and "+" not in pattern:
+            no_plus = cleaned.lstrip("+")
+            logger.info(f"Phone normalization: Pattern '{pattern}' does not allow '+'. Normalizing: {no_plus}")
+            return no_plus
+            
+        logger.info(f"Phone normalization: Defaulting to original cleaned: {cleaned}")
+        return cleaned
 
     def fill_select(self, fg: FieldGroup, value: str, search_prefix: str = None) -> bool:
         """
@@ -164,11 +218,37 @@ class UniversalApplyEngine(ABC):
             raise e
 
     def upload_file(self, fg: FieldGroup, file_path: str):
-        """Uploads a file to a file input locator."""
+        """Uploads a file to a file input locator and verifies filename visibility."""
         try:
             logger.info(f"UniversalEngine: upload_file label={fg.label_raw!r} path={file_path}")
             fg.locator.set_input_files(file_path)
-            time.sleep(1.0)  # Wait for upload processing
+            time.sleep(1.5)  # Wait for upload processing
+            
+            # Verify filename appears on the page
+            filename = os.path.basename(file_path)
+            is_visible = False
+            for _ in range(3):
+                try:
+                    if self.page.locator(f"text={filename}").count() > 0:
+                        is_visible = True
+                        break
+                except Exception:
+                    pass
+                time.sleep(1.0)
+                
+            if not is_visible:
+                logger.warning(f"UniversalEngine: Filename '{filename}' not detected after upload. Retrying upload once...")
+                fg.locator.set_input_files(file_path)
+                time.sleep(2.5)
+                try:
+                    if self.page.locator(f"text={filename}").count() > 0:
+                        logger.info("UniversalEngine: Upload verified on second attempt.")
+                    else:
+                        logger.warning("UniversalEngine: Upload filename still not detected, but continuing.")
+                except Exception:
+                    pass
+            else:
+                logger.info("UniversalEngine: Upload filename verification successful.")
         except Exception as e:
             logger.error(f"UniversalEngine: Failed upload_file on '{fg.label_raw}': {e}")
             raise e
@@ -271,15 +351,32 @@ class UniversalApplyEngine(ABC):
             return ""
 
     def _is_matching_option(self, option_text: str, answer_text: str) -> bool:
-        """Smart EEO and synonym matching for dropdown options."""
-        opt_lower = option_text.lower()
-        ans_lower = answer_text.lower()
-        if ans_lower in opt_lower or opt_lower in ans_lower:
+        """Smart EEO and synonym matching for dropdown options with strict boundary priority."""
+        opt_lower = option_text.lower().strip()
+        ans_lower = answer_text.lower().strip()
+        
+        # 1. Try exact match first
+        if opt_lower == ans_lower:
             return True
-        # Smart decline EEO options matching (e.g. mapping 'Prefer not to say' to 'I don't wish to answer')
+            
+        # 2. Match with word boundaries to avoid things like "India" matching "British Indian Ocean Territory"
+        import re
+        pattern = r'\b' + re.escape(ans_lower) + r'\b'
+        if re.search(pattern, opt_lower):
+            return True
+            
+        # 3. Smart decline EEO options matching (e.g. mapping 'Prefer not to say' to 'I don't wish to answer')
         decline_keywords = ["prefer not to", "decline to", "don't want to", "choose not to", "not disclose", "wish to answer", "don't wish"]
         is_ans_decline = any(kw in ans_lower for kw in ["prefer not to say", "prefer not to disclose", "decline", "not disclose", "don't wish to answer"])
         if is_ans_decline:
             if any(kw in opt_lower for kw in decline_keywords):
                 return True
+                
+        # 4. Fallback matching as a last resort
+        if len(ans_lower) >= 4 and (ans_lower in opt_lower or opt_lower in ans_lower):
+            # Exclude known false positives: India matching British Indian Ocean Territory
+            if ans_lower == "india" and "british indian ocean" in opt_lower:
+                return False
+            return True
+            
         return False

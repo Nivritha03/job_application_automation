@@ -101,7 +101,7 @@ def check_status():
         
         # 5. Fetch last 10 applications
         cursor.execute("""
-            SELECT j.title, c.name, j.site, a.status, a.date_applied, a.timestamp
+            SELECT j.title, c.name, j.site, a.status, a.date_applied, a.timestamp, a.skip_reason
             FROM applications a
             JOIN jobs j ON a.job_id = j.id
             JOIN companies c ON j.company_id = c.id
@@ -112,15 +112,20 @@ def check_status():
         
         if recent_jobs:
             print("\n--- RECENT APPLICATIONS (LAST 10) ---")
-            print(f"{'Company':<15} | {'Job Title':<30} | {'Platform':<10} | {'Status':<10}")
-            print("-" * 75)
+            print(f"{'Company':<15} | {'Job Title':<30} | {'Platform':<10} | {'Status':<30}")
+            print("-" * 94)
             for row in recent_jobs:
-                title, company, site, status, date_applied, timestamp = row
+                title, company, site, status, date_applied, timestamp, skip_reason = row
                 disp_company = company[:15]
-                disp_title = title[:30]
+                clean_title = title.replace("\n", " ").replace("\r", " ").strip()
+                disp_title = clean_title[:30]
                 disp_site = site[:10]
-                disp_status = status[:10]
-                print(f"{disp_company:<15} | {disp_title:<30} | {disp_site:<10} | {disp_status:<10}")
+                
+                disp_status = status
+                if status == "skipped" and skip_reason:
+                    disp_status = f"skipped: {skip_reason}"
+                disp_status = disp_status[:30]
+                print(f"{disp_company:<15} | {disp_title:<30} | {disp_site:<10} | {disp_status:<30}")
         else:
             print("\nNo applications processed yet.")
             

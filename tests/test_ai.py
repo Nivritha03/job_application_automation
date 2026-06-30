@@ -121,8 +121,9 @@ class TestGroqAI(unittest.TestCase):
         mock_validator.validate.return_value = True
         
         generator = AICoverLetterGenerator(self.mock_client, mock_validator, self.cache)
-        letter = generator.generate("SDE", "Amazon", "JD description", self.resume_text, self.profile)
+        letter, attempts = generator.generate("SDE", "Amazon", "JD description", self.resume_text, self.profile)
         self.assertEqual(letter, "This is a cover letter.")
+        self.assertEqual(attempts, 1)
 
     def test_question_answerer(self):
         self.mock_client.call_groq.return_value = "Django, Flask"

@@ -35,6 +35,12 @@ class Job(BaseModel):
     ai_missing_skills: List[str] = Field(default_factory=list)
     cover_letter_generated: bool = False
     filter_reason: Optional[str] = ""
+    skip_reason: Optional[str] = ""
+    validation_error: Optional[str] = ""
+    ai_attempts: int = 0
+    company_reply: Optional[str] = ""
+    country: Optional[str] = ""
+    is_remote: bool = False
     
 # -------------------------------------------------------------------
 # SQLAlchemy Models (Database Persistence)
@@ -68,6 +74,8 @@ class DBJob(Base):
     job_hash = Column(String, unique=True, nullable=True)
     date_found = Column(DateTime, default=datetime.utcnow)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    country = Column(String)
+    is_remote = Column(Boolean, default=False)
     
     company = relationship("DBCompany", back_populates="jobs")
     application = relationship("DBApplication", back_populates="job", uselist=False)
@@ -87,6 +95,10 @@ class DBApplication(Base):
     retry_count = Column(Integer, default=0)
     retry_after = Column(DateTime, nullable=True)
     timestamp = Column(DateTime, default=datetime.utcnow)
+    skip_reason = Column(String)
+    validation_error = Column(Text)
+    ai_attempts = Column(Integer, default=0)
+    company_reply = Column(Text)
     
     job = relationship("DBJob", back_populates="application")
 
