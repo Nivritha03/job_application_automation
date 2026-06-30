@@ -53,6 +53,7 @@ class WellfoundApply(UniversalApplyEngine):
             logger.info("WellfoundApply: Clicking Apply button.")
             apply_btn.click()
             time.sleep(3)
+            self.handle_redirect_tab()
             
             # Auto fill note/pitch if requested
             note_box = self.page.locator(NOTE_BOX).first

@@ -54,6 +54,7 @@ class NaukriApply(UniversalApplyEngine):
             logger.info("NaukriApply: Clicking Apply button.")
             apply_btn.click()
             time.sleep(3)
+            self.handle_redirect_tab()
             
             # Check for multi-step / questions popups
             popup = self.page.locator(POPUP).first

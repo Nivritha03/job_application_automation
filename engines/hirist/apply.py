@@ -53,6 +53,7 @@ class HiristApply(UniversalApplyEngine):
             logger.info("HiristApply: Clicking Apply button.")
             apply_btn.click()
             time.sleep(3)
+            self.handle_redirect_tab()
             
             # Check for questionnaire popups
             modal = self.page.locator(MODAL).first

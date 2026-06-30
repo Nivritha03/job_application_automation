@@ -81,6 +81,7 @@ class LinkedInApply(UniversalApplyEngine):
                     easy_apply_btn.scroll_into_view_if_needed()
                     easy_apply_btn.click(force=True)
                     time.sleep(2)
+                    self.handle_redirect_tab()
                     # Check if modal loaded
                     modal_check = self.page.locator(modal_selector).first
                     if modal_check.count() > 0 and modal_check.is_visible():

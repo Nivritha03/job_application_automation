@@ -53,6 +53,7 @@ class IndeedApply(UniversalApplyEngine):
             logger.info("IndeedApply: Clicking Indeed Apply button.")
             apply_btn.click()
             time.sleep(3)
+            self.handle_redirect_tab()
             
             # Check for iframe or modal popup dialogs
             modal_elem = self.page.locator(MODAL).first

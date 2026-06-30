@@ -9,7 +9,7 @@ echo ==========================================================
 echo.
 echo Running: python main.py --site all --location "india"
 echo.
-python main.py --site all --location "india"
+python main.py --site all --location "india" --ai
 echo.
 echo ==========================================================
 echo Pipeline execution completed.

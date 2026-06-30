@@ -20,6 +20,26 @@ class UniversalApplyEngine(ABC):
     def __init__(self, page: Page):
         self.page = page
 
+    def handle_redirect_tab(self) -> bool:
+        """
+        Checks if a click opened a new tab/window and switches self.page focus to it.
+        """
+        try:
+            pages = self.page.context.pages
+            if len(pages) > 1:
+                new_page = pages[-1]
+                if new_page != self.page:
+                    logger.info(f"UniversalEngine: New tab detected (URL: {new_page.url}). Switching context focus to the new tab.")
+                    self.page = new_page
+                    try:
+                        self.page.wait_for_load_state("domcontentloaded", timeout=5000)
+                    except Exception:
+                        pass
+                    return True
+        except Exception as e:
+            logger.warning(f"UniversalEngine: Check for redirect tab failed: {e}")
+        return False
+
     def fill_text(self, fg: FieldGroup, value: str):
         """Standard text input filling using sequential typing to trigger change events."""
         try:

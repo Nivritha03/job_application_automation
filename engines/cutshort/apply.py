@@ -53,6 +53,7 @@ class CutshortApply(UniversalApplyEngine):
             logger.info("CutshortApply: Clicking Apply button.")
             apply_btn.click()
             time.sleep(3)
+            self.handle_redirect_tab()
             
             # Check for chat panel redirect (Cutshort chat initiation)
             chat_input = self.page.locator(CHAT_INPUT).first

@@ -53,6 +53,7 @@ class GlassdoorApply(UniversalApplyEngine):
             logger.info("GlassdoorApply: Clicking Easy Apply button.")
             apply_btn.click()
             time.sleep(3)
+            self.handle_redirect_tab()
             
             # Auto fill multi-step dialogs if they load inside an iframe/modal
             modal_elem = self.page.locator(MODAL).first

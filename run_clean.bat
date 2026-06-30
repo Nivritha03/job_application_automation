@@ -11,5 +11,5 @@ if exist jobs.db (
 )
 python -c "from core.database import init_db; init_db()"
 echo.
-python main.py --site all --location "india"
+python main.py --site all --location "india" --ai
 pause
