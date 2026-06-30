@@ -594,7 +594,8 @@ class Pipeline:
         logger.info(f"STARTING PIPELINE for site '{self.site or 'all'}'")
         logger.info("=" * 50)
         
-        with PlaywrightManager(headless=self.headless) as context:
+        user_data_dir = self.config.get("browser", {}).get("user_data_dir", "./browser_data")
+        with PlaywrightManager(user_data_dir=user_data_dir, headless=self.headless) as context:
             page = context.new_page()
             
             # ── A. OTP Resumption Mode ───────────────────────────────────────

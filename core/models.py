@@ -41,6 +41,7 @@ class Job(BaseModel):
     company_reply: Optional[str] = ""
     country: Optional[str] = ""
     is_remote: bool = False
+    cover_letter: Optional[str] = ""
     
 # -------------------------------------------------------------------
 # SQLAlchemy Models (Database Persistence)

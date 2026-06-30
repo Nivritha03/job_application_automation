@@ -110,5 +110,98 @@
     "resume": "fullstack",
     "confidence": 80,
     "reason": "The fullstack resume has a broad range of skills, including programming languages, frameworks, and technologies, making it a versatile choice for various job descriptions."
+  },
+  "52f4697281646381d47d2fa568d8cd059695fcf763f362790992e8c873cf29a7": {
+    "match_score": 85,
+    "reasoning": "The candidate has a strong background in Python, Full-Stack development, Machine Learning, and Data Science, which aligns well with the job title 'Python Developer AI'. The candidate's experience in building scalable applications, optimizing ML models, and developing real-world AI solutions is a significant strength.",
+    "strengths": [
+      "Strong experience in Python",
+      "Full-Stack development skills",
+      "Machine Learning and NLP expertise",
+      "Data Science and Data Analytics background",
+      "Experience in building scalable applications and optimizing ML models"
+    ],
+    "missing_skills": [
+      "No specific skills mentioned in the job description to compare with",
+      "Lack of information about the company's specific requirements"
+    ],
+    "recommended_resume": "ml",
+    "should_apply": true
+  },
+  "2ceaa348b25c65e40118baa7e1be7a416345b41aa512d7828a950565d84be955": {
+    "resume": "fullstack",
+    "confidence": 90,
+    "reason": "The fullstack resume has a broad range of skills including programming languages, frameworks, and technologies, making it a versatile choice for a job with an unspecified description."
+  },
+  "1b6a0d5e018894888e2308d372c01fcc9f57238bba1de1b3cc8915658461e8ff": {
+    "match_score": 85,
+    "reasoning": "The candidate has strong experience in full-stack development, machine learning, and data analytics, which aligns with the job requirements. However, the job requires 2-12 years of experience in backend software development, and the candidate is a recent graduate with 0 years of experience.",
+    "strengths": [
+      "Strong hands-on experience in building scalable Python/FastAPI web applications",
+      "Experience with machine learning and data science",
+      "Ability to work across technologies, systems, and processes",
+      "Strong collaboration skills"
+    ],
+    "missing_skills": [
+      "Experience with event-driven architectures",
+      "Familiarity with subscription management, usage-based billing, or financial reporting systems",
+      "Direct leadership and mentorship experience",
+      "2-12 years of experience in backend software development"
+    ],
+    "recommended_resume": "fullstack",
+    "should_apply": true
+  },
+  "bb176de0dd4f126abcb45ad5e9cce3b625692d8c383b833d49ec0f6b34cc4fea": {
+    "resume": "fullstack",
+    "confidence": 90,
+    "reason": "The job description requires experience in backend software development, and the fullstack resume has relevant skills such as Python, Java, and experience with large-scale distributed systems."
+  },
+  "ff0366db6d174e11a9e05fc704a829b0fe81dd0e13f3251bdd074a79b880d885": {
+    "match_score": 78,
+    "reasoning": "The candidate has a strong background in Computer Science and experience in full-stack development, machine learning, and data analytics, which aligns with the job requirements. However, the candidate lacks direct experience in large-scale financial tracking systems and cloud-based services.",
+    "strengths": [
+      "Strong coding skills in Python",
+      "Experience in full-stack development",
+      "Knowledge of machine learning and data analytics",
+      "Strong collaboration skills"
+    ],
+    "missing_skills": [
+      "Large-scale financial tracking systems",
+      "Cloud-based services (e.g., gRPC, GraphQL, Docker/Kubernetes, AWS)",
+      "Direct experience with payment processing systems"
+    ],
+    "recommended_resume": "fullstack",
+    "should_apply": true
+  },
+  "9372f6ddec8ba9861dda34c1dbb3e87666e29e6a2f02f63cf795f5330aa4da98": {
+    "match_score": 82,
+    "reasoning": "The candidate has a strong background in Computer Science and experience in full-stack development, machine learning, and data analytics, which aligns with the job requirements. However, the candidate lacks direct experience in some of the special skill requirements such as ads technologies and microservice architecture.",
+    "strengths": [
+      "Backend development",
+      "Full-stack development",
+      "Machine learning",
+      "Data analytics",
+      "Cloud-based technologies",
+      "SQL/NoSQL Database",
+      "Version control"
+    ],
+    "missing_skills": [
+      "Ads technologies",
+      "Microservice architecture",
+      "Distributed systems",
+      "Project management",
+      "Collaboration with cross-functional stakeholders",
+      "Agile development"
+    ],
+    "recommended_resume": "fullstack",
+    "should_apply": true
+  },
+  "d04359471ded85d820699628dcc4eee4a63767817235f3c7ff5fe719ae4b6bad": {
+    "resume": "fullstack",
+    "confidence": 92,
+    "reason": "The selected resume has the most relevant skills for the job description, including backend development, cloud-based technologies, data processing, SQL/NoSQL databases, and experience with container orchestration and microservice architecture."
+  },
+  "7efb79e4a21796d910a420710f2be2b7dec67b7d65bea1d8c7e54eded644fa6f": {
+    "text": "I am excited to apply for the Software Engineer position at Reddit, where I can utilize my strong background in Full-Stack Development, Machine Learning, and Data Analytics to contribute to the development of scalable and reliable solutions. As a Computer Science undergraduate at Anurag University, I have gained hands-on experience in building scalable applications, optimizing ML models, and developing real-world AI solutions.\n\nThroughout my academic journey, I have worked on various projects that demonstrate my technical skills and ability to deliver high-quality solutions. For instance, I developed a real-time collaborative platform called Collab Sphere, which enables multiple users to draw and interact simultaneously. I also built a full-stack music streaming application called Synthesia Music Player, which features secure authentication and authorization, mood-based playlist recommendations, and a custom audio player with a responsive UI.\n\nIn addition to my project experience, I have also gained valuable skills through internships and virtual experience programs. As a Machine Learning Intern at Skillfied Mentor, I built and trained ML models on real-world datasets using Python, achieving improved prediction accuracy by 12-18% through optimization. I am confident that my technical background, combined with my passion for software development and machine learning, makes me a strong fit for this role.\n\nI am impressed by Reddit's commitment to building a community of communities and its focus on delivering high-quality solutions that meet stakeholders' needs. I am excited about the opportunity to collaborate with cross-functional partners and contribute to the development of cutting-edge technologies. I am confident that my skills and experience align well with the requirements of this role, and I look forward to the opportunity to discuss my application further."
   }
 }

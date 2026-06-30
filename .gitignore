@@ -17,6 +17,7 @@ config/answers.yaml
 
 # Browser user data
 browser_data/
+browser_data_test/
 browser/
 
 # Byte-compiled / Python files
