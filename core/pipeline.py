@@ -170,13 +170,54 @@ class Pipeline:
                    page.locator("a:has-text('Sign in')").first.is_visible():
                     return False
             elif platform == "foundit":
-                if page.locator("a[href*='/login']").first.is_visible() or \
-                   page.locator("a:has-text('Login')").first.is_visible():
+                # Check for profile name or logout/dashboard link (definite logged in indicators)
+                if page.locator("a[href*='/dashboard']").first.is_visible() or \
+                   page.locator("a[href*='/profile']").first.is_visible() or \
+                   page.locator(".userName").first.is_visible() or \
+                   page.locator("a:has-text('Logout')").first.is_visible() or \
+                   page.locator(".header-profile").first.is_visible() or \
+                   page.locator(".profile-icon").first.is_visible():
+                    return True
+                
+                # Check for candidate login (definitely logged out)
+                # Exclude recruiter login links
+                candidate_login = page.locator("a[href*='/login']:not([href*='recruiter'])").first
+                if candidate_login.is_visible():
                     return False
+                
+                # Check for generic Login button/text (but ensure it is not recruiter login)
+                generic_login = page.locator("a:has-text('Login')").first
+                if generic_login.is_visible():
+                    text = generic_login.inner_text().lower()
+                    if "recruiter" not in text:
+                        return False
             elif platform == "glassdoor":
+                # Check for logged-in profile selectors
+                if page.locator("button[data-test='nav-profile']").first.is_visible() or \
+                   page.locator("[class*='navProfile']").first.is_visible() or \
+                   page.locator("a[href*='/member/']").first.is_visible() or \
+                   page.locator(".Header_navProfileDropdown").first.is_visible() or \
+                   page.locator("a:has-text('Sign Out')").first.is_visible() or \
+                   page.locator("a:has-text('Logout')").first.is_visible() or \
+                   page.locator("span:has-text('Sign Out')").first.is_visible() or \
+                   page.locator("span:has-text('Logout')").first.is_visible():
+                    return True
+                
+                # Check for sign-in or join indicators
                 if page.locator("button[data-test='sign-in-button']").first.is_visible() or \
-                   page.locator("a:has-text('Sign In')").first.is_visible():
+                   page.locator("a:has-text('Sign In')").first.is_visible() or \
+                   page.locator("button:has-text('Sign In')").first.is_visible() or \
+                   page.locator("button:has-text('Sign in')").first.is_visible() or \
+                   page.locator("a:has-text('Sign in')").first.is_visible() or \
+                   page.locator("input#inlineUserEmail").first.is_visible() or \
+                   page.locator("input#userEmail").first.is_visible() or \
+                   page.locator("input#userPassword").first.is_visible() or \
+                   page.locator("div.authForm").first.is_visible() or \
+                   page.locator("[data-test='login-modal']").first.is_visible():
                     return False
+                
+                # Default to false for Glassdoor since profile indicators were not found
+                return False
         except Exception as e:
             logger.debug(f"Error checking login status selectors: {e}")
         return True
