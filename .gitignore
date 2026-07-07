@@ -10,6 +10,7 @@ jobs.db-journal
 # Screenshots and logs
 screenshots/
 logs/
+*.log
 
 # Local configuration and credentials
 .env
@@ -25,6 +26,12 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
+
+# Test caches
+.pytest_cache/
+
+# AI response cache
+data/ai_cache.json
 
 # OS specific files
 .DS_Store
