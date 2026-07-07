@@ -29,6 +29,13 @@ class HiristApply(UniversalApplyEngine):
                 return False
                 
             apply_btn = self.page.locator(APPLY_BTN).first
+            # Fallback: try text-based button if class-based not found
+            if apply_btn.count() == 0 or not apply_btn.is_visible():
+                text_btn = self.page.locator("button:has-text('Apply'), a:has-text('Apply')").first
+                if text_btn.count() > 0 and text_btn.is_visible():
+                    apply_btn = text_btn
+                    logger.info("HiristApply: Using text-based Apply button fallback.")
+
             if apply_btn.count() == 0 or not apply_btn.is_visible():
                 # Check for external apply button / link
                 external_btn = self.page.locator(EXTERNAL_APPLY_BTN).first

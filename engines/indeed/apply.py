@@ -32,7 +32,7 @@ class IndeedApply(UniversalApplyEngine):
             if apply_btn.count() == 0 or not apply_btn.is_visible():
                 # Check for external apply button / link
                 external_btn = self.page.locator(EXTERNAL_APPLY_BTN).first
-                if external_btn.count() > 0 or self.page.locator("button:has-text('Apply')").count() > 0:
+                if external_btn.count() > 0 and external_btn.is_visible():
                     logger.info("IndeedApply: External apply detected. Setting status to external_redirect.")
                     job.status = "external_redirect"
                     job.failure_type = "external_redirect"
