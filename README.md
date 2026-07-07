@@ -18,6 +18,14 @@ AI Job Agent is a premium, automated end-to-end job search and application pipel
 
 ## 🌟 Key Features
 
+* **Modular Plugin Architecture**: Implements a modular engine design built on a base class ([core/base_engine.py](file:///d:/Nivritha/Projects/Automation/project/core/base_engine.py)). Individual search/apply drivers are highly decoupled and easily extensible.
+* **Groq AI Decision Assistant**: Integrated using the OpenAI Python SDK pointing to Groq's high-speed API (powered by `llama-3.3-70b-versatile` by default), enabling:
+  * **AI Job Analyzer ([ai/analyzer.py](file:///d:/Nivritha/Projects/Automation/project/ai/analyzer.py))**: Evaluates candidate compatibility against target job descriptions, generating a match score, reasoning, strengths, missing skills, and apply recommendation.
+  * **AI Resume Ranker ([ai/resume_ranker.py](file:///d:/Nivritha/Projects/Automation/project/ai/resume_ranker.py))**: Evaluates and automatically selects the optimal resume template based on JD alignment.
+  * **AI Cover Letter Generator ([ai/cover_letter.py](file:///d:/Nivritha/Projects/Automation/project/ai/cover_letter.py))**: Dynamically drafts custom cover letters matching candidate experience and job requirements.
+  * **AI Question Answerer ([ai/question_answerer.py](file:///d:/Nivritha/Projects/Automation/project/ai/question_answerer.py))**: Automatically solves custom and open-ended application questions.
+  * **AI Validator ([ai/validator.py](file:///d:/Nivritha/Projects/Automation/project/ai/validator.py))**: Runs safety and verification checks on generated text to eliminate hallucinations and match profile data.
+  * **AICache ([ai/cache.py](file:///d:/Nivritha/Projects/Automation/project/ai/cache.py))**: Automatically caches API responses in `data/ai_cache.json` to prevent duplicate LLM calls and costs.
 * **Multi-Platform Search & Parsing**: Seamlessly integrates with LinkedIn Easy Apply, traditional platforms (Indeed, Naukri, Glassdoor, Hirist, Foundit, Cutshort, Wellfound, Instahyre), and direct ATS job boards (Greenhouse, Lever, Ashby, Workable).
 * **Smart Scoring & Filtering**: Multi-criteria matching engine evaluates roles by title, salary, location, description, and keywords using custom scoring weights.
 * **Resume Auto-Selection**: Evaluates job descriptions to automatically select the most aligned resume template (e.g., General, Backend, AI/ML, Frontend).
@@ -37,6 +45,7 @@ AI Job Agent is a premium, automated end-to-end job search and application pipel
 * **Scheduling**: APScheduler (Interval triggers with custom randomized jitter)
 * **Styling & CLI UI**: Rich console widgets (Table, Panel, Prompt, Progress)
 * **Testing**: Pytest
+* **AI Engine**: Groq SDK / OpenAI Client (`llama-3.3-70b-versatile`)
 
 ---
 
@@ -52,6 +61,7 @@ graph TD
     B --> G[engines/forms/filler.py Form Filler]
     B --> H[notifications/notifier.py Alerts & Logs]
     B --> I[core/database.py SQLite DB]
+    B --> AI[ai/groq_client.py Groq Client]
     
     subgraph Storage & Logs
         I --> J[(jobs.db)]
@@ -69,18 +79,36 @@ graph TD
         D --> O[LinkedIn/Indeed/Glassdoor...]
         D --> P[Greenhouse/Lever/Ashby...]
     end
+
+    subgraph Groq AI Assistant
+        AI --> AIC[ai/cache.py Cache]
+        AI --> AIA[ai/analyzer.py Analyzer]
+        AI --> AIR[ai/resume_ranker.py Resume Ranker]
+        AI --> AICL[ai/cover_letter.py Cover Letter]
+        AI --> AIQA[ai/question_answerer.py QA]
+        AI --> AIV[ai/validator.py Validator]
+    end
 ```
 
 ### Main Directories & Components
 * [main.py](file:///d:/Nivritha/Projects/Automation/project/main.py): Pipeline entry point parsing CLI flags and starting the automated runs or Telegram verification modes.
+* [ai/](file:///d:/Nivritha/Projects/Automation/project/ai): Contains the Groq AI Decision Assistant modules.
+  * [groq_client.py](file:///d:/Nivritha/Projects/Automation/project/ai/groq_client.py): Core client wrapper using the OpenAI API spec pointing to Groq.
+  * [analyzer.py](file:///d:/Nivritha/Projects/Automation/project/ai/analyzer.py): Evaluates candidate compatibility and score for listings.
+  * [resume_ranker.py](file:///d:/Nivritha/Projects/Automation/project/ai/resume_ranker.py): Automatically evaluates and selects the optimal resume template.
+  * [cover_letter.py](file:///d:/Nivritha/Projects/Automation/project/ai/cover_letter.py): Automatically generates customized cover letters.
+  * [question_answerer.py](file:///d:/Nivritha/Projects/Automation/project/ai/question_answerer.py): Solves complex, custom form questions.
+  * [validator.py](file:///d:/Nivritha/Projects/Automation/project/ai/validator.py): Performs sanity and safety checks against hallucinations.
+  * [cache.py](file:///d:/Nivritha/Projects/Automation/project/ai/cache.py): Manages persistent JSON caching for LLM responses.
 * [core/](file:///d:/Nivritha/Projects/Automation/project/core): Core infrastructure logic.
+  * [base_engine.py](file:///d:/Nivritha/Projects/Automation/project/core/base_engine.py): Base class template for platform-specific apply engines.
   * [pipeline.py](file:///d:/Nivritha/Projects/Automation/project/core/pipeline.py): The main coordinator that drives job scanning, login checks, limits checks, and submission loops.
   * [browser.py](file:///d:/Nivritha/Projects/Automation/project/core/browser.py): Controls headful/headless Chrome profiles, setting custom viewport parameters and caching user data.
   * [models.py](file:///d:/Nivritha/Projects/Automation/project/core/models.py): Defines data schemas (Pydantic models) and database entities (`DBJob`, `DBCompany`, `DBApplication`, `DBRun`, etc.).
   * [database.py](file:///d:/Nivritha/Projects/Automation/project/core/database.py): Houses standard SQLAlchemy engines, session makers, and initialization logic.
 * [engines/](file:///d:/Nivritha/Projects/Automation/project/engines): Platform-specific crawlers, parser modules, and auto-apply mechanics.
-  * `linkedin`, `greenhouse`, `lever`, etc.: Platform search/apply drivers.
-  * [forms/](file:///d:/Nivritha/Projects/Automation/project/engines/forms): Houses the selector matching, file inputs, custom inputs, and React Select dropdown filling logic.
+  * `linkedin`, `greenhouse`, `lever`, etc.: Platform search/apply drivers conforming to `BaseEngine`.
+  * [forms/](file:///d:/Nivritha/Projects/Automation/project/engines/forms): Houses the selector matching, file inputs, custom inputs, and React Select dropdown filling logic (integrates with `AIQuestionAnswerer` for fallback answers).
 * [notifications/](file:///d:/Nivritha/Projects/Automation/project/notifications): Standardized messaging infrastructure formatters and handlers to deliver updates to Telegram or Email.
 * [dashboard/](file:///d:/Nivritha/Projects/Automation/project/dashboard): Contains `terminal.py`, the CLI dashboard.
 
@@ -89,16 +117,16 @@ graph TD
 ## 🔄 Process Flow
 
 ```
-   [1. Scan & Discover] ──> [2. Eligibility Scoring] ──> [3. Resume Selection]
-                                                                  │
-                                                                  ▼
-   [6. Telegram Notifications] <── [5. Apply Engine] <── [4. Forms Detection & Fill]
+    [1. Scan & Discover] ──> [2. Eligibility Scoring] ──> [3. Resume Selection]
+                                                                   │
+                                                                   ▼
+    [6. Telegram Notifications] <── [5. Apply Engine] <── [4. Forms Detection & Fill]
 ```
 
 1. **Scan & Discover**: The script reads the target platform list and search keywords. Playwright navigates the respective boards, extracts job listings, and checks for duplication in the database.
-2. **Eligibility Scoring**: Compares the discovered job against criteria specified in `config/scoring.yaml`. Checks titles against `skip_keywords`, calculates matching keyword densities, and decides whether the candidate fits.
-3. **Resume Selection**: Inspects the job content and cross-references it with configurations inside `config/resumes.yaml` to choose the optimal resume.
-4. **Forms Detection & Fill**: Maps form input tags (textareas, selectors, files, radio options) dynamically, maps standard profile fields (Name, Email, Social links) and fills them.
+2. **Eligibility Scoring & AI Analysis**: Compares the discovered job against criteria specified in `config/scoring.yaml`. When AI is enabled, the job is analyzed for match compatibility scoring.
+3. **Resume Selection**: Inspects the job content and cross-references it with configurations inside `config/resumes.yaml` or leverages `AIResumeRanker` to choose the optimal resume.
+4. **Forms Detection & Fill**: Maps form input tags (textareas, selectors, files, radio options) dynamically, maps standard profile fields (Name, Email, Social links) and fills them (leveraging `AIQuestionAnswerer` when needed).
 5. **Apply Engine**: Handles the dry-run, live submit, or stalls the application in a `pending_review` state if user intervention is required.
 6. **Telegram Notifications**: Formats markdown details and dispatches them instantly to the designated chat, along with full screenshots of the final confirmation or captcha/error states.
 
@@ -108,7 +136,7 @@ graph TD
 
 All configuration templates are located in the [config/](file:///d:/Nivritha/Projects/Automation/project/config) folder:
 
-* **[config.yaml](file:///d:/Nivritha/Projects/Automation/project/config/config.yaml)**: Controls scheduling interval, random limits (daily/hourly bounds), platform company listings, browser dimensions, and email settings.
+* **[config.yaml](file:///d:/Nivritha/Projects/Automation/project/config/config.yaml)**: Controls scheduling interval, random limits (daily/hourly bounds), platform company listings, browser dimensions, browser profile storage location (`browser.user_data_dir`), and AI Assistant properties (Groq API keys, model, temperature, max tokens, and caching switch).
 * **[answers.yaml](file:///d:/Nivritha/Projects/Automation/project/config/answers.yaml)**: Contains standard personal details (name, email, phone, location, salary expectations, standard URLs) and exact key-value pairs matching custom form questions.
 * **[resumes.yaml](file:///d:/Nivritha/Projects/Automation/project/config/resumes.yaml)**: Configures the paths to your local resume PDF templates and the keyword alignments required to trigger their selection.
 * **[scoring.yaml](file:///d:/Nivritha/Projects/Automation/project/config/scoring.yaml)**: Dictates threshold scoring limits, description multipliers, and required skillset matches.
@@ -118,6 +146,7 @@ Create a `.env` file in the root directory:
 ```env
 TELEGRAM_BOT_TOKEN=your_telegram_bot_token
 TELEGRAM_CHAT_ID=your_telegram_chat_id
+GROQ_API_KEY=your_groq_api_key
 ```
 
 ---
@@ -125,17 +154,20 @@ TELEGRAM_CHAT_ID=your_telegram_chat_id
 ## 💻 Execution Modes
 
 ### 1. Automated Mode (CLI)
-To run a automated job agent cycle immediately:
+To run an automated job agent cycle immediately:
 ```bash
-# Run on all configured job boards
-python main.py --site all --location "India"
+# Run on all configured job boards (AI enabled by default)
+python main.py --site all --location "India" --ai
 
 # Run a dry run (form filling only, no final submit click)
-python main.py --site linkedin --dry-run
+python main.py --site linkedin --dry-run --ai
+
+# Run without AI assistance
+python main.py --site all --no-ai
 ```
 
 Alternatively, you can execute the pre-configured Windows launcher scripts:
-* **`run_automated.bat`**: Launches the automated search/apply pipeline for all sites with the location constraint configured to `"india"`.
+* **`run_automated.bat`**: Launches the automated search/apply pipeline for all sites (AI-enabled) with the location constraint configured to `"india"`.
 * **`run_clean.bat`**: Resets the local `jobs.db` database to clear previous attempts/retries and initiates a fresh automated cycle.
 
 ### 2. Interactive Console Dashboard
@@ -158,7 +190,8 @@ The agent utilizes multiple mitigation strategies to bypass bot detection:
 1. **Rhythm Pacing**: Employs random delay ranges (e.g. `30s` to `180s`) before applying, mimicking human hesitation and reading behavior.
 2. **Action Jitters**: Adds micro-delays between keystrokes (`press_sequentially`) and dropdown selections.
 3. **Session Persistence**: Plays inside the `./browser_data` profile context, ensuring cookies and authentications persist, reducing the need for repetitive logins.
-4. **Manual Login Prompting**: If a platform detects that a session has expired, it triggers a warning in Telegram and halts, allowing the user up to 120 seconds to complete authentication manually in the headful browser window before resuming.
+4. **Manual Login Prompting & Challenge Settling**: If a platform detects that a session has expired, it triggers a warning in Telegram and halts. It automatically checks for security checkpoints, challenges, captcha prompts, and OTP screens, waiting up to 120 seconds and allowing page settling before resuming.
+5. **Multi-Tab Redirection Safety**: Tracks newly opened windows or tab redirects ([handle_redirect_tab]) to avoid browser automation failures when navigating application flows.
 
 ---
 
@@ -168,4 +201,4 @@ To run components tests, run the following command in the root folder:
 ```bash
 python -m pytest
 ```
-Tests cover standard components validation (filtering, resume selector, form mapping, and message formatters).
+Tests cover standard components validation (filtering, resume selector, form mapping, message formatters, and AI components).

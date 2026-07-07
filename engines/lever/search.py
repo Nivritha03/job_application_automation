@@ -31,9 +31,6 @@ class LeverSearch(BaseSearchEngine):
                     
                     # Avoid duplicates of same URL and ignore "apply" link text
                     if abs_url not in [j.url for j in jobs_found] and title and title.lower() != "apply":
-                        if query and query.lower() not in title.lower():
-                            continue
-                            
                         # Clean title by removing standard headers
                         clean_title = re.sub(r'\b(Apply|Hybrid|On-Site|Remote|Full-Time)\b', '', title, flags=re.IGNORECASE).strip()
                         jobs_found.append(Job(

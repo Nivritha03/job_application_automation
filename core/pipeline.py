@@ -244,15 +244,33 @@ class Pipeline:
             self.db.refresh(company)
         return company
 
-    def _save_job_state(self, job: Job):
+    def _save_job_state(self, job: Job, platform: str = None):
         import datetime
         import hashlib
+        from sqlalchemy.exc import IntegrityError
+
+        # ── Guard: skip browser error pages (e.g. LinkedIn "This page isn't working") ──
+        ERROR_TITLES = ["this page isn't working", "page not found", "404", "error", "access denied"]
+        if any(e in (job.title or "").lower() for e in ERROR_TITLES):
+            logger.warning(f"_save_job_state: Skipping error-page job '{job.title}' ({job.url})")
+            return
+
+        # ── Ensure session is clean before any DB work ──────────────────────────────
+        try:
+            self.db.rollback()
+        except Exception:
+            pass
+
         company = self._get_or_create_company(job.company)
-        
+
         norm = f"{job.company.strip().lower()}|{job.title.strip().lower()}|{job.url.strip().lower()}"
         job_hash = hashlib.sha256(norm.encode('utf-8')).hexdigest()
-            
+
+        # ── Look up by hash first, then by URL as fallback (catches hash-miss duplicates) ──
         db_job = self.db.query(DBJob).filter(DBJob.job_hash == job_hash).first()
+        if not db_job:
+            db_job = self.db.query(DBJob).filter(DBJob.url == job.url).first()
+
         if not db_job:
             db_job = DBJob(
                 title=job.title,
@@ -263,7 +281,7 @@ class Pipeline:
                 requirements=job.requirements,
                 skills=",".join(job.skills),
                 url=job.url,
-                site=self.site,
+                site=platform or self.site,
                 apply_url=job.url,
                 search_keyword=self.search_query,
                 job_hash=job_hash,
@@ -272,60 +290,86 @@ class Pipeline:
                 is_remote=job.is_remote
             )
             self.db.add(db_job)
-            self.db.commit()
-            self.db.refresh(db_job)
+            try:
+                self.db.commit()
+                self.db.refresh(db_job)
+            except IntegrityError:
+                # URL or hash already exists (race condition or duplicate search result)
+                self.db.rollback()
+                # Try to fetch the existing row after rollback
+                db_job = self.db.query(DBJob).filter(DBJob.url == job.url).first()
+                if not db_job:
+                    logger.warning(f"_save_job_state: Could not insert or retrieve job '{job.title}' — skipping application record.")
+                    return
+            except Exception as e:
+                self.db.rollback()
+                logger.error(f"_save_job_state: Unexpected DB error inserting job '{job.title}': {e}")
+                return
         else:
-            db_job.country = job.country
-            db_job.is_remote = job.is_remote
-            self.db.commit()
-            
-        # Check retry count
+            try:
+                db_job.country = job.country
+                db_job.is_remote = job.is_remote
+                self.db.commit()
+            except Exception as e:
+                self.db.rollback()
+                logger.error(f"_save_job_state: Error updating job '{job.title}': {e}")
+
+        # ── Application record ───────────────────────────────────────────────────────
         retry_count = 0
-        existing_app = self.db.query(DBApplication).filter(DBApplication.job_id == db_job.id).first()
+        existing_app = None
+        try:
+            existing_app = self.db.query(DBApplication).filter(DBApplication.job_id == db_job.id).first()
+        except Exception:
+            self.db.rollback()
+
         if existing_app:
             retry_count = (existing_app.retry_count or 0) + 1
-            
+
         date_applied = datetime.datetime.utcnow() if job.applied else None
-        
-        # Check failure_type and retry_after attributes on Job object
         failure_type = getattr(job, "failure_type", None)
         retry_after  = getattr(job, "retry_after", None)
-        
-        if existing_app:
-            existing_app.resume_used = job.resume_used
-            existing_app.match_score = job.score
-            existing_app.applied = job.applied
-            existing_app.status = job.status
-            existing_app.error_message = job.error_message
-            existing_app.failure_type = failure_type
-            existing_app.screenshot_path = job.screenshot_path
-            existing_app.date_applied = date_applied
-            existing_app.retry_count = retry_count
-            existing_app.retry_after = retry_after
-            existing_app.skip_reason = job.skip_reason
-            existing_app.validation_error = job.validation_error
-            existing_app.ai_attempts = job.ai_attempts
-            existing_app.company_reply = job.company_reply
-        else:
-            app = DBApplication(
-                job_id=db_job.id,
-                resume_used=job.resume_used,
-                match_score=job.score,
-                applied=job.applied,
-                status=job.status,
-                error_message=job.error_message,
-                failure_type=failure_type,
-                screenshot_path=job.screenshot_path,
-                date_applied=date_applied,
-                retry_count=retry_count,
-                retry_after=retry_after,
-                skip_reason=job.skip_reason,
-                validation_error=job.validation_error,
-                ai_attempts=job.ai_attempts,
-                company_reply=job.company_reply
-            )
-            self.db.add(app)
-        self.db.commit()
+
+        try:
+            if existing_app:
+                existing_app.resume_used = job.resume_used
+                existing_app.match_score = job.score
+                existing_app.applied = job.applied
+                existing_app.status = job.status
+                existing_app.error_message = job.error_message
+                existing_app.failure_type = failure_type
+                existing_app.screenshot_path = job.screenshot_path
+                existing_app.date_applied = date_applied
+                existing_app.retry_count = retry_count
+                existing_app.retry_after = retry_after
+                existing_app.skip_reason = job.skip_reason
+                existing_app.validation_error = job.validation_error
+                existing_app.ai_attempts = job.ai_attempts
+                existing_app.company_reply = job.company_reply
+            else:
+                app = DBApplication(
+                    job_id=db_job.id,
+                    resume_used=job.resume_used,
+                    match_score=job.score,
+                    applied=job.applied,
+                    status=job.status,
+                    error_message=job.error_message,
+                    failure_type=failure_type,
+                    screenshot_path=job.screenshot_path,
+                    date_applied=date_applied,
+                    retry_count=retry_count,
+                    retry_after=retry_after,
+                    skip_reason=job.skip_reason,
+                    validation_error=job.validation_error,
+                    ai_attempts=job.ai_attempts,
+                    company_reply=job.company_reply
+                )
+                self.db.add(app)
+            self.db.commit()
+        except Exception as e:
+            self.db.rollback()
+            logger.error(f"_save_job_state: Failed to save application record for '{job.title}': {e}")
+
+
 
     def _save_html_snapshot(self, page, step: str, title: str) -> str:
         import os
@@ -806,7 +850,7 @@ class Pipeline:
                                 self.jobs_skipped += 1
                                 job.status = "skipped"
                                 job.skip_reason = "Already applied"
-                                self._save_job_state(job)
+                                self._save_job_state(job, platform=platform)
                                 continue
                             # 2. If it was a dry-run and we are still doing dry-runs, skip it
                             if existing_app.status == "dry_run" and self.dry_run:
@@ -814,7 +858,7 @@ class Pipeline:
                                 self.jobs_skipped += 1
                                 job.status = "skipped"
                                 job.skip_reason = "Already dry-runned"
-                                self._save_job_state(job)
+                                self._save_job_state(job, platform=platform)
                                 continue
                             # 3. If it is pending review and we are still in review mode, skip it
                             if existing_app.status == "pending_review" and self.review_required:
@@ -822,7 +866,7 @@ class Pipeline:
                                 self.jobs_skipped += 1
                                 job.status = "skipped"
                                 job.skip_reason = "Already pending review"
-                                self._save_job_state(job)
+                                self._save_job_state(job, platform=platform)
                                 continue
                             
                     # ── Company daily limits check ──────────────────────────
@@ -840,7 +884,7 @@ class Pipeline:
                         self.jobs_skipped += 1
                         job.status = "skipped"
                         job.skip_reason = "Daily company limit reached"
-                        self._save_job_state(job)
+                        self._save_job_state(job, platform=platform)
                         continue
                         
                     try:
@@ -851,20 +895,20 @@ class Pipeline:
                         if getattr(job, "status", "") == "external_redirect":
                             logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
                             self.jobs_skipped += 1
-                            self._save_job_state(job)
+                            self._save_job_state(job, platform=platform)
                             continue
                             
                         if getattr(job, "status", "") == "no_auto_apply":
                             logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
                             self.jobs_skipped += 1
-                            self._save_job_state(job)
+                            self._save_job_state(job, platform=platform)
                             continue
                             
                         if job.error_message:
                             logger.error(f"Pipeline: Parsing failed for '{job.title}': {job.error_message}")
                             self.errors += 1
                             job.status = "error"
-                            self._save_job_state(job)
+                            self._save_job_state(job, platform=platform)
                             
                             from core.models import DBError
                             self.db.add(DBError(job_title=job.title, error_message=job.error_message))
@@ -938,7 +982,7 @@ class Pipeline:
                             self.jobs_skipped += 1
                             job.status = "skipped"
                             job.skip_reason = skip_reason
-                            self._save_job_state(job)
+                            self._save_job_state(job, platform=platform)
                             continue
                             
                         job = self.filter_engine.score_job(job)
@@ -946,7 +990,7 @@ class Pipeline:
                             logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Keyword mismatch ({getattr(job, 'filter_reason', 'No match')})")
                             self.jobs_skipped += 1
                             job.status = "skipped"
-                            self._save_job_state(job)
+                            self._save_job_state(job, platform=platform)
                             continue
                             
                         self.jobs_eligible += 1
@@ -975,7 +1019,7 @@ class Pipeline:
                                 self.jobs_skipped += 1
                                 job.status = "skipped"
                                 job.skip_reason = "AI score below threshold"
-                                self._save_job_state(job)
+                                self._save_job_state(job, platform=platform)
                                 continue
                                 
                             logger.info(f"Pipeline: AI approved job '{job.title}' (AI Match Score: {job.score})")
@@ -1006,13 +1050,23 @@ class Pipeline:
                                 job.cover_letter_generated = True
                                 logger.info(f"Pipeline: AI successfully generated a cover letter (Attempts: {attempts}).")
                             else:
-                                logger.warning(f"Pipeline: SKIPPED '{job.title}' - Reason: Validation failed")
-                                self.jobs_skipped += 1
-                                job.status = "skipped"
-                                job.skip_reason = "Validation failed"
-                                job.validation_error = "Cover letter failed strict compliance verification after 3 attempts."
-                                self._save_job_state(job)
-                                continue
+                                # Fall back to static cover letter from profile rather than skipping the job
+                                static_cl = (
+                                    self.candidate_profile.get("free_text", {}).get("cover letter", "") or
+                                    self.candidate_profile.get("cover_letter", "")
+                                )
+                                if static_cl:
+                                    job.cover_letter = static_cl
+                                    job.cover_letter_generated = False
+                                    logger.warning(
+                                        f"Pipeline: AI cover letter validation failed after {attempts} attempts for "
+                                        f"'{job.title}' at '{job.company}'. Using static profile cover letter as fallback."
+                                    )
+                                else:
+                                    logger.warning(
+                                        f"Pipeline: AI cover letter failed and no static fallback found. "
+                                        f"Proceeding without a cover letter for '{job.title}'."
+                                    )
                         else:
                             # Resume Selector (Deterministic)
                             if self.resume and self.resume.lower() != "auto":
@@ -1112,14 +1166,14 @@ class Pipeline:
                             self.jobs_skipped += 1
                             job.status = "skipped"
                             job.skip_reason = "External redirect"
-                            self._save_job_state(job)
+                            self._save_job_state(job, platform=platform)
                             continue
                         if getattr(job, "status", "") == "no_auto_apply":
                             logger.info(f"Pipeline: SKIPPED '{job.title}' - Reason: Platform does not support auto-apply")
                             self.jobs_skipped += 1
                             job.status = "skipped"
                             job.skip_reason = "Platform does not support auto-apply"
-                            self._save_job_state(job)
+                            self._save_job_state(job, platform=platform)
                             continue
                             
                         if self.dry_run:
@@ -1199,7 +1253,7 @@ class Pipeline:
                                                          len(getattr(apply_engine, "question_handler").free_text)
                                                          
                         self.db.commit()
-                        self._save_job_state(job)
+                        self._save_job_state(job, platform=platform)
                         
                     except Exception as e:
                         logger.error(f"Pipeline error on job {job.title}: {e}")
@@ -1217,7 +1271,7 @@ class Pipeline:
                         
                         from datetime import datetime, timedelta
                         job.retry_after = datetime.utcnow() + timedelta(hours=1)
-                        self._save_job_state(job)
+                        self._save_job_state(job, platform=platform)
                         
                         self.telegram_notifier.notify_apply_failed(
                             company=job.company,

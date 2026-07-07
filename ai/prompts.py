@@ -160,6 +160,9 @@ Response structure:
 # 7. Validation Prompt
 VALIDATION_PROMPT = """You are a strict data compliance validator. Verify that the generated response is completely factual based ONLY on the candidate's actual resume and profile.
 
+IMPORTANT CONTEXT:
+{target_company_note}
+
 GENERATED RESPONSE TO VALIDATE:
 {generated_text}
 
@@ -170,15 +173,17 @@ CANDIDATE PROFILE:
 {profile_text}
 
 Identify if the generated response invents, fabricates, or exaggerates any:
-1. Past employer/company names not in the candidate details. NOTE: References to the target company being applied to (the employer this cover letter is for) are completely valid and expected. Do NOT mark references to the target company as fabrications or errors.
+1. Past employer/company names NOT in the candidate details (ignore the target company — it is expected and valid).
 2. Education, schools, GPAs, graduation dates.
 3. Certifications, licenses, or specific skills.
 4. Experience years, internships, or projects.
+
+IMPORTANT: A cover letter NATURALLY mentions the target company and says positive things about it — that is normal and expected. Only flag content where the CANDIDATE'S OWN background is invented or fabricated.
 
 Return a STRICT JSON response only.
 Response structure:
 {{
   "valid": true,
-  "reason": "If valid, write 'Passed verification'. If invalid, list the exact fabricated claims found."
+  "reason": "If valid, write 'Passed verification'. If invalid, list the exact fabricated claims found about the CANDIDATE (not about the company)."
 }}
 """

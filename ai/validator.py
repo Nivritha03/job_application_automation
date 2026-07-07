@@ -6,7 +6,7 @@ class AIValidator:
     def __init__(self, groq_client):
         self.client = groq_client
 
-    def validate(self, generated_text: str, resume_text: str, profile_text: str) -> bool:
+    def validate(self, generated_text: str, resume_text: str, profile_text: str, target_company: str = "") -> bool:
         if not generated_text:
             return False
             
@@ -14,11 +14,19 @@ class AIValidator:
         if not generated_text.strip():
             return False
 
-        # Format validation prompt
+        # Format validation prompt, injecting target company so the LLM
+        # does not falsely flag the hiring company as a "fabricated employer"
+        target_company_note = (
+            f"The target company for this cover letter is '{target_company}'. "
+            f"References to '{target_company}' are completely valid and expected — do NOT flag them."
+            if target_company else
+            "The cover letter may reference the target company being applied to by name — that is valid and expected."
+        )
         prompt = VALIDATION_PROMPT.format(
             generated_text=generated_text,
             resume_text=resume_text,
-            profile_text=profile_text
+            profile_text=profile_text,
+            target_company_note=target_company_note
         )
 
         try:

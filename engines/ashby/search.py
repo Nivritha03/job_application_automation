@@ -49,9 +49,6 @@ class AshbySearch(BaseSearchEngine):
                     title = re.sub(r'\s+', ' ', title).strip()
                     
                     if abs_url not in [j.url for j in jobs_found] and title:
-                        if query and query.lower() not in title.lower():
-                            continue
-                        
                         job_id = abs_url.rstrip("/").split("/")[-1]
                         jobs_found.append(Job(
                             id=job_id,

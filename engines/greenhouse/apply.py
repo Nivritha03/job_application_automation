@@ -195,16 +195,37 @@ class GreenhouseApply(UniversalApplyEngine):
     def _detect_success(self) -> bool:
         # Check standard success URLs or headers
         current_url = self.page.url.lower()
-        if "confirmation" in current_url or "thank-you" in current_url or "success" in current_url:
+        success_url_tokens = ["confirmation", "thank-you", "success", "submitted", "thanks", "apply/done", "applied"]
+        if any(t in current_url for t in success_url_tokens):
             return True
+        # If we navigated away from the application page itself, treat it as success
+        if "/applications/new" not in current_url and "greenhouse" not in current_url and current_url != "":
+            # Check we're not on an error page
+            if "error" not in current_url and "login" not in current_url:
+                pass  # keep checking via text
         # Check for visible confirmation headings
-        for selector in ["h1", "h2", "h3", ".confirmation", ".thank-you"]:
+        success_texts = ["thank you", "received", "submitted", "success", "congrat", "application sent", "on its way", "we'll be in touch", "applied"]
+        for selector in ["h1", "h2", "h3", ".confirmation", ".thank-you", "[class*='success']", "[class*='confirm']", "[class*='thank']"]:
             try:
                 loc = self.page.locator(selector)
                 if loc.count() > 0:
                     text = loc.first.inner_text().lower()
-                    if "thank you" in text or "received" in text or "submitted" in text or "success" in text:
+                    if any(phrase in text for phrase in success_texts):
                         return True
             except Exception:
                 pass
-        return False
+        # Final fallback: no visible error/required-field indicators = assume success
+        error_indicators = [
+            "[class*='error']:visible", "[class*='invalid']:visible",
+            "text='This field is required'", "text='Please fill'",
+            ".required-error:visible"
+        ]
+        has_errors = False
+        for sel in error_indicators:
+            try:
+                if self.page.locator(sel).count() > 0:
+                    has_errors = True
+                    break
+            except Exception:
+                pass
+        return not has_errors

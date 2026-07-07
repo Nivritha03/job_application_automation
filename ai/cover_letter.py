@@ -39,8 +39,8 @@ class AICoverLetterGenerator:
                     if len(lines) > 2:
                         cover_letter_text = "\n".join(lines[1:-1])
 
-                # Validate facts in cover letter
-                is_valid = self.validator.validate(cover_letter_text, resume_text, str(profile_details))
+                # Validate facts in cover letter (pass company so validator won't flag target company name as fabrication)
+                is_valid = self.validator.validate(cover_letter_text, resume_text, str(profile_details), target_company=company)
                 if is_valid:
                     # Save to cache
                     if self.client.cache_enabled:

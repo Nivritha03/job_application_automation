@@ -18,6 +18,28 @@ class LinkedInJobParser(BaseJobParser):
             except Exception as wait_err:
                 logger.warning(f"LinkedInJobParser: Timeout waiting for selectors: {wait_err}")
             time.sleep(1)
+
+            # ── Detect browser/LinkedIn error pages before parsing ────────────────────
+            ERROR_PAGE_SIGNALS = [
+                "this page isn't working",
+                "page not found",
+                "404",
+                "this job is no longer available",
+                "this job has expired",
+                "the page you're looking for",
+                "access denied",
+                "something went wrong",
+            ]
+            try:
+                page_title = self.page.title().lower()
+                body_preview = self.page.locator("body").inner_text()[:500].lower()
+                if any(sig in page_title or sig in body_preview for sig in ERROR_PAGE_SIGNALS):
+                    logger.warning(f"LinkedInJobParser: Error page detected for {job.url} (title='{self.page.title()}'). Marking as skip.")
+                    job.error_message = f"Error page: {self.page.title()}"
+                    job.status = "external_redirect"
+                    return job
+            except Exception:
+                pass
             
             # Check login page redirects
             if "login" in self.page.url or "signin" in self.page.url:

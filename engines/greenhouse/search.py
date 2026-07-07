@@ -56,9 +56,6 @@ class GreenhouseSearch(BaseSearchEngine):
                     
                     # Clean title and avoid duplicates of same URL
                     if abs_url not in [j.url for j in jobs_found] and title:
-                        if query and query.lower() not in title.lower():
-                            continue
-                            
                         # Clean any tags or "New" badges from title
                         clean_title = re.sub(r'\bNew\b', '', title, flags=re.IGNORECASE).strip()
                         jobs_found.append(Job(
