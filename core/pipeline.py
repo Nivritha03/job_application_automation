@@ -121,105 +121,255 @@ class Pipeline:
         self.errors = 0
         self.otp_pending = 0
         
+    def _is_visible(self, locator) -> bool:
+        """Safe wrapper around locator.is_visible() — returns False on any exception or if count is 0."""
+        try:
+            if locator.count() == 0:
+                return False
+            return locator.first.is_visible()
+        except Exception:
+            return False
+
     def _check_login_status(self, platform: str, page) -> bool:
         url = page.url.lower()
-        
-        # Define keywords that indicate authentication, signup, checkpoints, OTP, or verification challenges
+
+        # URL-level auth keywords — definitive logout signals
         auth_keywords = [
             "login", "signin", "signup", "register", "join", "auth",
-            "challenge", "checkpoint", "verify", "verification", 
+            "challenge", "checkpoint", "verify", "verification",
             "otp", "security", "captcha", "mfa", "confirm"
         ]
-        
         if any(kw in url for kw in auth_keywords):
+            logger.debug(f"_check_login_status: Auth keyword found in URL ({url}) → not logged in")
             return False
-            
+
         try:
-            # Check if body text contains verification or OTP prompts
             body_text = page.locator("body").inner_text().lower()
-            if any(w in body_text for w in ["verification code", "security code", "confirm you're a human", "otp", "enter the code", "checkpoint"]):
+            if any(w in body_text for w in [
+                "verification code", "security code", "confirm you're a human",
+                "otp", "enter the code", "checkpoint"
+            ]):
+                logger.debug(f"_check_login_status: Auth phrase found in body → not logged in")
                 return False
-                
+
             if platform == "linkedin":
-                if page.locator("input#username").count() > 0 or \
-                   page.locator("a:has-text('Sign in')").first.is_visible() or \
-                   page.locator("a[href*='/login']").first.is_visible():
+                # ── Positive indicators (logged IN) ─────────────────────────
+                # Profile photo in the global nav, or the feed/home link only present when signed in
+                if (
+                    self._is_visible(page.locator("img.global-nav__me-photo"))
+                    or self._is_visible(page.locator("a[href*='/feed']"))
+                    or self._is_visible(page.locator("a[href*='/in/']"))
+                    or self._is_visible(page.locator(".global-nav__me"))
+                    or self._is_visible(page.locator("[data-test-app-aware-link*='/feed']"))
+                ):
+                    logger.debug("_check_login_status: LinkedIn positive indicator found → logged in")
+                    return True
+
+                # ── Negative indicators (logged OUT) — scope to nav/header only ──
+                # Scoping prevents matching the footer "Sign in" link that exists even when logged in
+                nav_signin = page.locator("nav a:has-text('Sign in'), header a:has-text('Sign in'), "
+                                          "nav a:has-text('Sign In'), header a:has-text('Sign In')")
+                if (
+                    self._is_visible(page.locator("input#username"))
+                    or self._is_visible(nav_signin)
+                    or self._is_visible(page.locator("a.nav__button-secondary"))  # "Join now" CTA
+                ):
+                    logger.debug("_check_login_status: LinkedIn negative indicator found → not logged in")
                     return False
+
+                # Default to logged in for LinkedIn (persistent profile should handle session)
+                return True
+
             elif platform == "naukri":
-                if page.locator("a#login_Layer").first.is_visible() or \
-                   page.locator("a:has-text('Login')").first.is_visible():
+                # ── Positive indicators first ────────────────────────────────
+                if (
+                    self._is_visible(page.locator(".nau_userIcon"))
+                    or self._is_visible(page.locator(".user-name"))
+                    or self._is_visible(page.locator("a[href*='mnjuser']"))
+                    or self._is_visible(page.locator("a[href*='/mnjuser/homepage']"))
+                    or self._is_visible(page.locator("[class*='naukri-logo'] + nav a[href*='profile']"))
+                    or self._is_visible(page.locator("span.nau_userMenuLink"))
+                ):
+                    logger.debug("_check_login_status: Naukri positive indicator found → logged in")
+                    return True
+
+                # ── Negative indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("a#login_Layer"))
+                    or self._is_visible(page.locator("a[href*='/nlogin']"))
+                    or self._is_visible(page.locator("input#usernameField"))
+                ):
+                    logger.debug("_check_login_status: Naukri negative indicator found → not logged in")
                     return False
+
+                return True
+
             elif platform == "instahyre":
-                if page.locator("a[href*='/login']").first.is_visible() or \
-                   page.locator("a:has-text('Login')").first.is_visible():
+                # ── Positive indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("a[href*='/profile']"))
+                    or self._is_visible(page.locator("a[href*='/dashboard']"))
+                    or self._is_visible(page.locator(".user-avatar, .profile-avatar, [class*='avatar']"))
+                ):
+                    return True
+
+                # ── Negative indicators (scope to nav/header) ────────────────
+                nav_login = page.locator("nav a[href*='/login'], header a[href*='/login']")
+                if (
+                    self._is_visible(nav_login)
+                    or self._is_visible(page.locator("a[href='/login/']:not([href*='recruiter'])"))
+                    or self._is_visible(page.locator("button:has-text('Log In'), button:has-text('Login')"))
+                ):
+                    logger.debug("_check_login_status: Instahyre negative indicator → not logged in")
                     return False
+
+                return True
+
             elif platform == "wellfound":
-                if page.locator("a[href*='/login']").first.is_visible() or \
-                   page.locator("a:has-text('Log In')").first.is_visible():
+                # ── Positive indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("a[href*='/u/']"))
+                    or self._is_visible(page.locator("[class*='userAvatar'], [class*='profilePhoto']"))
+                    or self._is_visible(page.locator("a[href*='/account']"))
+                ):
+                    return True
+
+                # ── Negative indicators (nav scoped) ─────────────────────────
+                nav_login = page.locator("nav a[href*='/login'], header a[href*='/login']")
+                if (
+                    self._is_visible(nav_login)
+                    or self._is_visible(page.locator("a:has-text('Log In'):not(footer a)"))
+                    or self._is_visible(page.locator("button:has-text('Log In')"))
+                    or self._is_visible(page.locator("input[name='email'][placeholder*='email']"))
+                ):
+                    logger.debug("_check_login_status: Wellfound negative indicator → not logged in")
                     return False
+
+                return True
+
             elif platform == "hirist":
-                if page.locator("a[href*='/login']").first.is_visible() or \
-                   page.locator("a:has-text('Login')").first.is_visible():
+                # ── Positive indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("a[href*='/profile'], a[href*='/dashboard']"))
+                    or self._is_visible(page.locator("[class*='user-name'], [class*='userName']"))
+                ):
+                    return True
+
+                # ── Negative indicators (nav scoped) ─────────────────────────
+                nav_login = page.locator("nav a[href*='/login'], header a[href*='/login']")
+                if (
+                    self._is_visible(nav_login)
+                    or self._is_visible(page.locator("a:has-text('Login'):not(footer a)"))
+                ):
+                    logger.debug("_check_login_status: Hirist negative indicator → not logged in")
                     return False
+
+                return True
+
             elif platform == "cutshort":
-                if page.locator("a:has-text('Login')").first.is_visible() or \
-                   page.locator("button:has-text('Login')").first.is_visible():
+                # ── Positive indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("a[href*='/profile'], a[href*='/dashboard']"))
+                    or self._is_visible(page.locator("[class*='avatar'], [class*='userPhoto']"))
+                ):
+                    return True
+
+                # ── Negative indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("a:has-text('Login'):not(footer a)"))
+                    or self._is_visible(page.locator("button:has-text('Login')"))
+                    or self._is_visible(page.locator("input[type='email']"))
+                ):
+                    logger.debug("_check_login_status: Cutshort negative indicator → not logged in")
                     return False
+
+                return True
+
             elif platform == "indeed":
-                if page.locator("a[href*='/login']").first.is_visible() or \
-                   page.locator("a:has-text('Sign in')").first.is_visible():
+                # ── Positive indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("a[href*='/account']"))
+                    or self._is_visible(page.locator("[data-gnav-employer-menu]"))
+                    or self._is_visible(page.locator("a[href*='/resume']"))
+                    or self._is_visible(page.locator("[class*='AccountMenu'], [class*='userNav']"))
+                ):
+                    return True
+
+                # ── Negative indicators (nav scoped) ─────────────────────────
+                nav_signin = page.locator("nav a[href*='/login'], header a[href*='/login'], "
+                                          "nav a:has-text('Sign in'), header a:has-text('Sign in')")
+                if (
+                    self._is_visible(nav_signin)
+                    or self._is_visible(page.locator("input#ifl-InputFormField-3"))  # Indeed email input
+                ):
+                    logger.debug("_check_login_status: Indeed negative indicator → not logged in")
                     return False
+
+                return True
+
             elif platform == "foundit":
-                # Check for profile name or logout/dashboard link (definite logged in indicators)
-                if page.locator("a[href*='/dashboard']").first.is_visible() or \
-                   page.locator("a[href*='/profile']").first.is_visible() or \
-                   page.locator(".userName").first.is_visible() or \
-                   page.locator("a:has-text('Logout')").first.is_visible() or \
-                   page.locator(".header-profile").first.is_visible() or \
-                   page.locator(".profile-icon").first.is_visible():
+                # ── Positive indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator(".userName"))
+                    or self._is_visible(page.locator(".header-profile"))
+                    or self._is_visible(page.locator(".profile-icon"))
+                    or self._is_visible(page.locator("a[href*='/dashboard']"))
+                    or self._is_visible(page.locator("a:has-text('Logout')"))
+                ):
+                    logger.debug("_check_login_status: Foundit positive indicator → logged in")
                     return True
-                
-                # Check for candidate login (definitely logged out)
-                # Exclude recruiter login links
-                candidate_login = page.locator("a[href*='/login']:not([href*='recruiter'])").first
-                if candidate_login.is_visible():
+
+                # ── Negative indicators (exclude recruiter links) ─────────────
+                if (
+                    self._is_visible(page.locator("a[href*='/login']:not([href*='recruiter'])"))
+                ):
+                    logger.debug("_check_login_status: Foundit negative indicator → not logged in")
                     return False
-                
-                # Check for generic Login button/text (but ensure it is not recruiter login)
-                generic_login = page.locator("a:has-text('Login')").first
-                if generic_login.is_visible():
-                    text = generic_login.inner_text().lower()
-                    if "recruiter" not in text:
-                        return False
+
+                generic_login = page.locator("a:has-text('Login')")
+                if self._is_visible(generic_login):
+                    try:
+                        text = generic_login.first.inner_text().lower()
+                        if "recruiter" not in text:
+                            return False
+                    except Exception:
+                        pass
+
+                return True
+
             elif platform == "glassdoor":
-                # Check for logged-in profile selectors
-                if page.locator("button[data-test='nav-profile']").first.is_visible() or \
-                   page.locator("[class*='navProfile']").first.is_visible() or \
-                   page.locator("a[href*='/member/']").first.is_visible() or \
-                   page.locator(".Header_navProfileDropdown").first.is_visible() or \
-                   page.locator("a:has-text('Sign Out')").first.is_visible() or \
-                   page.locator("a:has-text('Logout')").first.is_visible() or \
-                   page.locator("span:has-text('Sign Out')").first.is_visible() or \
-                   page.locator("span:has-text('Logout')").first.is_visible():
+                # ── Positive indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("button[data-test='nav-profile']"))
+                    or self._is_visible(page.locator("[class*='navProfile']"))
+                    or self._is_visible(page.locator("a[href*='/member/']"))
+                    or self._is_visible(page.locator(".Header_navProfileDropdown"))
+                    or self._is_visible(page.locator("a:has-text('Sign Out')"))
+                    or self._is_visible(page.locator("span:has-text('Sign Out')"))
+                    or self._is_visible(page.locator("a:has-text('Logout')"))
+                ):
+                    logger.debug("_check_login_status: Glassdoor positive indicator → logged in")
                     return True
-                
-                # Check for sign-in or join indicators
-                if page.locator("button[data-test='sign-in-button']").first.is_visible() or \
-                   page.locator("a:has-text('Sign In')").first.is_visible() or \
-                   page.locator("button:has-text('Sign In')").first.is_visible() or \
-                   page.locator("button:has-text('Sign in')").first.is_visible() or \
-                   page.locator("a:has-text('Sign in')").first.is_visible() or \
-                   page.locator("input#inlineUserEmail").first.is_visible() or \
-                   page.locator("input#userEmail").first.is_visible() or \
-                   page.locator("input#userPassword").first.is_visible() or \
-                   page.locator("div.authForm").first.is_visible() or \
-                   page.locator("[data-test='login-modal']").first.is_visible():
+
+                # ── Negative indicators ──────────────────────────────────────
+                if (
+                    self._is_visible(page.locator("button[data-test='sign-in-button']"))
+                    or self._is_visible(page.locator("a:has-text('Sign In')"))
+                    or self._is_visible(page.locator("button:has-text('Sign In')"))
+                    or self._is_visible(page.locator("button:has-text('Sign in')"))
+                    or self._is_visible(page.locator("input#inlineUserEmail"))
+                    or self._is_visible(page.locator("input#userEmail"))
+                    or self._is_visible(page.locator("div.authForm"))
+                    or self._is_visible(page.locator("[data-test='login-modal']"))
+                ):
+                    logger.debug("_check_login_status: Glassdoor negative indicator → not logged in")
                     return False
-                
-                # Default to false for Glassdoor since profile indicators were not found
+
+                # Safe default for Glassdoor — require positive confirmation
                 return False
+
         except Exception as e:
-            logger.debug(f"Error checking login status selectors: {e}")
+            logger.debug(f"_check_login_status: Unexpected error checking '{platform}': {e}")
         return True
 
     def __del__(self):

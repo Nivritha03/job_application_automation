@@ -24,9 +24,18 @@ class LinkedInSearch(BaseSearchEngine):
                 logger.warning(f"LinkedInSearch: Page navigation warning (proceeding): {goto_err}")
             time.sleep(2)
             
-            # Check if login is required
-            if "login" in self.page.url or "signin" in self.page.url:
-                logger.error("LinkedInSearch: Authentication required. User is not logged into persistent profile.")
+            # Check if login is required — URL redirect or visible login elements
+            current_url = self.page.url.lower()
+            if "login" in current_url or "signin" in current_url or "authwall" in current_url:
+                logger.error("LinkedInSearch: Redirected to login page. User is not logged in.")
+                return []
+
+            if self.page.locator("input#username").count() > 0 and self.page.locator("input#username").first.is_visible():
+                logger.error("LinkedInSearch: Login form detected on page. User is not logged in.")
+                return []
+
+            if self.page.locator("a.nav__button-secondary").count() > 0 and self.page.locator("a.nav__button-secondary").first.is_visible():
+                logger.error("LinkedInSearch: 'Join now' nav button visible — user is not logged in.")
                 return []
                 
             # Scroll job listings list to load all items

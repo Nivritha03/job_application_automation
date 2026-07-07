@@ -26,8 +26,20 @@ class NaukriSearch(BaseSearchEngine):
                 logger.warning(f"NaukriSearch: Page goto warning: {e}")
                 
             time.sleep(3)
-            
-            # Selectors for job cards on Naukri list page
+
+            # Check if login is required
+            current_url = self.page.url.lower()
+            if "login" in current_url or "signin" in current_url:
+                logger.error("NaukriSearch: Redirected to login page. User is not logged in.")
+                return []
+
+            # Check for visible login modal or username input
+            if (self.page.locator("input#usernameField").count() > 0 and
+                    self.page.locator("input#usernameField").first.is_visible()):
+                logger.error("NaukriSearch: Login modal detected. User is not logged in.")
+                return []
+
+
             card_selectors = ["article.jobTuple", "div.srp-jobtuple", "[class*='jobTuple']", "article"]
             cards = []
             for sel in card_selectors:

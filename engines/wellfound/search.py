@@ -24,8 +24,20 @@ class WellfoundSearch(BaseSearchEngine):
                 logger.warning(f"WellfoundSearch: Page goto warning: {e}")
                 
             time.sleep(3)
-            
-            # Selectors for job cards on Wellfound
+
+            # Check if login is required
+            current_url = self.page.url.lower()
+            if "login" in current_url or "signin" in current_url:
+                logger.error("WellfoundSearch: Redirected to login page. User is not logged in.")
+                return []
+
+            # Check for visible Log In button or email input form in the nav
+            nav_login = self.page.locator("nav a[href*='/login'], header a[href*='/login'], nav button:has-text('Log In')")
+            if nav_login.count() > 0 and nav_login.first.is_visible():
+                logger.error("WellfoundSearch: Login button visible in nav. User is not logged in.")
+                return []
+
+
             card_selectors = ["div[class*='jobCard']", "div[class*='OpportunityCard']", "div.styles_result__QoLgP", "div.styles_jobCard__1"]
             cards = []
             for sel in card_selectors:

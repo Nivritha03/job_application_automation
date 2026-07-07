@@ -25,8 +25,20 @@ class InstahyreSearch(BaseSearchEngine):
                 logger.warning(f"InstahyreSearch: Page goto warning: {e}")
                 
             time.sleep(3)
-            
-            # Selectors for job cards on Instahyre
+
+            # Check if login is required
+            current_url = self.page.url.lower()
+            if "login" in current_url or "signin" in current_url:
+                logger.error("InstahyreSearch: Redirected to login page. User is not logged in.")
+                return []
+
+            # Check for visible login link or button in nav
+            nav_login = self.page.locator("nav a[href*='/login'], header a[href*='/login']")
+            if nav_login.count() > 0 and nav_login.first.is_visible():
+                logger.error("InstahyreSearch: Login link visible in nav. User is not logged in.")
+                return []
+
+
             card_selectors = ["div.job-opportunity, div.opportunity-card, div.employer-block, div.job-card"]
             cards = []
             for sel in card_selectors:

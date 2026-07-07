@@ -24,8 +24,23 @@ class GlassdoorSearch(BaseSearchEngine):
                 logger.warning(f"GlassdoorSearch: Page goto warning: {e}")
                 
             time.sleep(3)
-            
-            # Selectors for job listing items on Glassdoor
+
+            # Check if login is required
+            current_url = self.page.url.lower()
+            if "login" in current_url or "signin" in current_url:
+                logger.error("GlassdoorSearch: Redirected to login page. User is not logged in.")
+                return []
+
+            # Check for visible sign-in button or auth form
+            signin_btn = self.page.locator(
+                "button[data-test='sign-in-button'], input#inlineUserEmail, "
+                "input#userEmail, div.authForm, [data-test='login-modal']"
+            )
+            if signin_btn.count() > 0 and signin_btn.first.is_visible():
+                logger.error("GlassdoorSearch: Login form detected on page. User is not logged in.")
+                return []
+
+
             card_selectors = ["li[class*='JobCard']", "li.react-job-listing", "article.job-card", "li[data-id]"]
             cards = []
             for sel in card_selectors:
