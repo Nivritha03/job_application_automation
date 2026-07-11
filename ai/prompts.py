@@ -78,7 +78,7 @@ INSTRUCTIONS:
 """
 
 # 4. Question Answerer Prompt
-QUESTION_ANSWERER_PROMPT = """You are an assistant completing a job application form. Answer the question accurately using the candidate's details.
+QUESTION_ANSWERER_PROMPT = """You are the candidate completing a job application form. Answer the question accurately in the first person ("I", "me", "my") as if you are the candidate.
 
 QUESTION:
 {question}
@@ -96,11 +96,12 @@ JOB DETAILS:
 {job_details}
 
 INSTRUCTIONS:
-1. Provide a direct, professional, and personalized answer to the question.
-2. Base the answer STRICTLY on the candidate's resume and profile details.
-3. DO NOT fabricate or hallucinate any details (experiences, notice periods, authorization, relocations, skills).
-4. If the information required to answer the question is not present in the candidate's resume or profile details, return the exact string: REQUIRES_USER_INPUT.
-5. Provide ONLY the final answer text or REQUIRES_USER_INPUT. Do not include any explanations or conversational text.
+1. Speak STRICTLY in the first-person perspective ("I", "me", "my"). NEVER refer to the candidate in the third-person (do NOT use "the candidate", "this applicant", "she", "he", "they", or "her/his"). For example, write "I am a student" instead of "the candidate is a student".
+2. If the question asks for years of experience (e.g., "years of experience with...", "how many years..."), return a SINGLE numerical value or simple number (e.g., "0", "1", "2"). Do NOT write a sentence or explain.
+3. If the question is a yes/no question, return a clean "Yes" or "No".
+4. Base the answer STRICTLY on the candidate's resume and profile details. Do NOT fabricate or hallucinate any details.
+5. If the information required to answer is missing, return the exact string: REQUIRES_USER_INPUT.
+6. Provide ONLY the final answer text or REQUIRES_USER_INPUT. Do not include any meta-explanations, conversational filler, or conversational text.
 """
 
 # 5. Recruiter Message Prompt
@@ -126,8 +127,7 @@ INSTRUCTIONS:
 """
 
 # 6. Form Assistant Fallback Prompt
-FORM_ASSISTANT_PROMPT = """You are an AI form filling assistant. You are given a form field that could not be mapped by deterministic rules.
-Determine the correct answer to fill into this field based on the candidate's details.
+FORM_ASSISTANT_PROMPT = """You are the candidate completing a job application form. Answer the field accurately in the first person ("I", "me", "my") as if you are the candidate.
 
 FIELD DETAILS:
 Label: {label}
@@ -145,10 +145,12 @@ CANDIDATE PROFILE:
 {profile_text}
 
 INSTRUCTIONS:
-1. Deduce the answer for this field using the candidate profile and selected resume.
-2. If the field is a standard text input, return a suitable short string.
-3. If the required information is completely missing and cannot be inferred, return REQUIRES_USER_INPUT.
-4. Return a STRICT JSON response only.
+1. Speak STRICTLY in the first-person perspective ("I", "me", "my"). NEVER refer to the candidate in the third-person (do NOT use "the candidate", "this applicant", "she", "he", "they", or "her/his"). For example, write "I am a student" instead of "the candidate is a student".
+2. If the field requests years of experience (e.g., "years of experience", "how many years"), return a SINGLE numerical value or simple number (e.g., "0", "1", "2"). Do NOT write a sentence or explain.
+3. Deduce the answer for this field using the candidate profile and selected resume.
+4. If the field is a standard text input, return a suitable short string.
+5. If the required information is completely missing and cannot be inferred, return REQUIRES_USER_INPUT.
+6. Return a STRICT JSON response only.
 Response structure:
 {{
   "answer": "deduced_answer_string_or_REQUIRES_USER_INPUT",

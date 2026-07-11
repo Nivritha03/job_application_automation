@@ -25,6 +25,7 @@ class WorkableApply(UniversalApplyEngine):
             logger.error(f"WorkableApply: Failed to load answers config: {e}")
 
     def apply(self, job: Job, dry_run: bool = False, screenshot_cb=None) -> bool:
+        logger.info("WORKABLE APPLY ENGINE")
         logger.info(f"WorkableApply: Starting application flow for {job.title!r} at {job.company}")
         try:
             # ── 1. Navigate to Apply URL ──────────────────────────────────────
@@ -171,6 +172,8 @@ class WorkableApply(UniversalApplyEngine):
                 continue
 
             value = resolvers.get(key, self.answers.get(key, ""))
+            if not value and getattr(self, "ai_enabled", False) and getattr(self, "ai_question_answerer", None):
+                value = self._resolve_profile_field_ai(key, fg)
             if not value:
                 continue
 

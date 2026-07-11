@@ -642,11 +642,15 @@ class Pipeline:
                 requirements=db_job.requirements,
                 url=db_job.url,
                 skills=db_job.skills.split(",") if db_job.skills else [],
-                resume_used=app.resume_used
+                resume_used=app.resume_used,
+                platform=db_job.site
             )
             
             try:
-                apply_class = APPLY_ENGINES.get(db_job.site, APPLY_ENGINES["universal"])
+                apply_class = APPLY_ENGINES.get(db_job.site)
+                if apply_class is None:
+                    logger.warning(f"Pipeline: No apply engine found for site '{db_job.site}'. Skipping retry.")
+                    continue
                 apply_engine = apply_class(page)
                 
                 # Attach job and AI properties
@@ -674,7 +678,13 @@ class Pipeline:
                             apply_engine.filler.answers["cover_letter"] = job.cover_letter
 
                 start_time = time.time()
+                logger.info(
+                    f"Platform={job.platform}, "
+                    f"Apply Engine={type(apply_engine).__name__}, "
+                    f"Would Apply={job.would_apply}"
+                )
                 success = apply_engine.apply(job, dry_run=self.dry_run)
+                logger.info(f"Apply returned {success}")
                 duration = time.time() - start_time
                 
                 company_db = self._get_or_create_company(job.company)
@@ -734,7 +744,8 @@ class Pipeline:
                 requirements=db_job.requirements,
                 url=db_job.url,
                 skills=db_job.skills.split(",") if db_job.skills else [],
-                resume_used=app.resume_used
+                resume_used=app.resume_used,
+                platform=db_job.site
             )
             
             try:
@@ -749,7 +760,13 @@ class Pipeline:
                     apply_engine.candidate_profile = self.candidate_profile
                     apply_engine.resumes_config = self.resumes_config
                     
+                logger.info(
+                    f"Platform={job.platform}, "
+                    f"Apply Engine={type(apply_engine).__name__}, "
+                    f"Would Apply={job.would_apply}"
+                )
                 success = apply_engine.apply(job, dry_run=False)
+                logger.info(f"Apply returned {success}")
                 if success:
                     app.applied = True
                     app.status = "applied"
@@ -985,6 +1002,7 @@ class Pipeline:
                 apply_engine = apply_class(page)
                 
                 for job in jobs:
+                    job.platform = platform
                     # ── Duplication Check (Never Apply Twice) ────────────────
                     import hashlib
                     norm = f"{job.company.strip().lower()}|{job.title.strip().lower()}|{job.url.strip().lower()}"
@@ -1045,12 +1063,16 @@ class Pipeline:
                         if getattr(job, "status", "") == "external_redirect":
                             logger.info(f"Pipeline: Skipped '{job.title}' - Reason: External redirect")
                             self.jobs_skipped += 1
+                            job.status = "skipped"
+                            job.skip_reason = "External redirect"
                             self._save_job_state(job, platform=platform)
                             continue
                             
                         if getattr(job, "status", "") == "no_auto_apply":
                             logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Platform does not support auto-apply")
                             self.jobs_skipped += 1
+                            job.status = "skipped"
+                            job.skip_reason = "Platform does not support auto-apply"
                             self._save_job_state(job, platform=platform)
                             continue
                             
@@ -1140,6 +1162,7 @@ class Pipeline:
                             logger.info(f"Pipeline: Skipped '{job.title}' - Reason: Keyword mismatch ({getattr(job, 'filter_reason', 'No match')})")
                             self.jobs_skipped += 1
                             job.status = "skipped"
+                            job.skip_reason = f"Keyword mismatch ({getattr(job, 'filter_reason', 'No match')})"
                             self._save_job_state(job, platform=platform)
                             continue
                             
@@ -1283,9 +1306,15 @@ class Pipeline:
                             else:
                                 return apply_engine.apply(job, dry_run=False, screenshot_cb=screenshot_cb)
                                 
+                        logger.info(
+                            f"Platform={job.platform}, "
+                            f"Apply Engine={type(apply_engine).__name__}, "
+                            f"Would Apply={job.would_apply}"
+                        )
                         success = False
                         try:
                             success = execute_apply()
+                            logger.info(f"Apply returned {success}")
                         except Exception as apply_err:
                             logger.warning(f"Pipeline: Application attempt 1 failed: {apply_err}. Refreshing and retrying once...")
                             try:
@@ -1294,6 +1323,7 @@ class Pipeline:
                                 page.wait_for_load_state("networkidle", timeout=10000)
                                 time.sleep(3)
                                 success = execute_apply()
+                                logger.info(f"Apply returned {success}")
                             except Exception as retry_err:
                                 logger.error(f"Pipeline: Application retry attempt 2 failed: {retry_err}")
                                 success = False
@@ -1307,6 +1337,7 @@ class Pipeline:
                                 page.wait_for_load_state("networkidle", timeout=10000)
                                 time.sleep(3)
                                 success = execute_apply()
+                                logger.info(f"Apply returned {success}")
                             except Exception as retry_err:
                                 logger.error(f"Pipeline: Application retry attempt 2 failed: {retry_err}")
                                 success = False

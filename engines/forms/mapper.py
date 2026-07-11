@@ -55,6 +55,8 @@ def _indicators(fg: FieldGroup) -> str:
 
 def _is_question(fg: FieldGroup, indicators: str) -> bool:
     """Heuristic: is this a Q&A question rather than a profile field?"""
+    if fg.field_type in ("radio", "checkbox"):
+        return True
     # Textareas are almost always question/essay fields unless they're cover letters
     if fg.field_type == "textarea" and "cover" not in indicators:
         return True

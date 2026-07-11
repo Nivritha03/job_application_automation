@@ -7,6 +7,7 @@ class AIValidator:
         self.client = groq_client
 
     def validate(self, generated_text: str, resume_text: str, profile_text: str, target_company: str = "") -> bool:
+        generated_text = str(generated_text) if generated_text is not None else ""
         if not generated_text:
             return False
             

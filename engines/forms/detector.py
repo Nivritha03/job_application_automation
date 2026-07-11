@@ -42,6 +42,23 @@ class FormDetector:
         """Attempt to find the label text for an input element via multiple strategies."""
         label_text = ""
 
+        # Strategy 0: For radio buttons, find the group legend / header question text
+        try:
+            type_attr = (locator.get_attribute("type") or "").lower()
+            if type_attr == "radio":
+                for parent_depth in range(1, 5):
+                    parent_loc = locator.locator(f"xpath=ancestor::div[{parent_depth}]|ancestor::fieldset[{parent_depth}]").first
+                    if parent_loc.count() > 0:
+                        group_label_loc = parent_loc.locator("legend, span[class*='label'], div[class*='label'], label[class*='label']").first
+                        if group_label_loc.count() > 0:
+                            lt = group_label_loc.inner_text().strip()
+                            if lt and lt.lower() not in ("yes", "no", "true", "false", "i agree"):
+                                # Clean up extra whitespace/newlines
+                                lt = " ".join(lt.split())
+                                return lt
+        except Exception:
+            pass
+
         # Strategy 1: <label for="id">
         if id_attr:
             try:
@@ -169,15 +186,19 @@ class FormDetector:
                     continue
 
                 # Skip file inputs that are invisible but allow them for resume uploads
-                if field_type != "file":
+                if field_type not in ("file", "radio", "checkbox"):
                     try:
                         if not loc.is_visible() or not loc.is_enabled():
                             continue
                     except Exception:
                         continue
 
-                # Dedup by id
-                dedup_key = id_attr or name_attr or placeholder
+                # Dedup by id/name
+                if field_type == "radio" and name_attr:
+                    dedup_key = name_attr
+                else:
+                    dedup_key = id_attr or name_attr or placeholder
+
                 if dedup_key and dedup_key in seen_ids:
                     continue
                 if dedup_key:

@@ -19,17 +19,19 @@ AI Job Agent is a premium, automated end-to-end job search and application pipel
 ## 🌟 Key Features
 
 * **Modular Plugin Architecture**: Implements a modular engine design built on a base class ([core/base_engine.py](file:///d:/Nivritha/Projects/Automation/project/core/base_engine.py)). Individual search/apply drivers are highly decoupled and easily extensible.
-* **Groq AI Decision Assistant**: Integrated using the OpenAI Python SDK pointing to Groq's high-speed API (powered by `llama-3.3-70b-versatile` by default), enabling:
+* **Groq AI Decision Assistant**: Integrated using the OpenAI Python SDK pointing to Groq's high-speed API (powered by `llama-3.1-8b-instant` by default to avoid daily TPM rate limits), enabling:
   * **AI Job Analyzer ([ai/analyzer.py](file:///d:/Nivritha/Projects/Automation/project/ai/analyzer.py))**: Evaluates candidate compatibility against target job descriptions, generating a match score, reasoning, strengths, missing skills, and apply recommendation.
   * **AI Resume Ranker ([ai/resume_ranker.py](file:///d:/Nivritha/Projects/Automation/project/ai/resume_ranker.py))**: Evaluates and automatically selects the optimal resume template based on JD alignment.
   * **AI Cover Letter Generator ([ai/cover_letter.py](file:///d:/Nivritha/Projects/Automation/project/ai/cover_letter.py))**: Dynamically drafts custom cover letters matching candidate experience and job requirements.
-  * **AI Question Answerer ([ai/question_answerer.py](file:///d:/Nivritha/Projects/Automation/project/ai/question_answerer.py))**: Automatically solves custom and open-ended application questions.
+  * **AI Question Answerer ([ai/question_answerer.py](file:///d:/Nivritha/Projects/Automation/project/ai/question_answerer.py))**: Automatically solves custom and open-ended application questions using a first-person tone ("I", "my", "me") and numeric outputs for experience questions.
+  * **AI Profile Field Resolver ([core/base_engine.py](file:///d:/Nivritha/Projects/Automation/project/core/base_engine.py))**: Dynamically resolves standard profile fields (such as degree, discipline, school, etc.) using Groq if they are left blank or missing in static templates.
   * **AI Validator ([ai/validator.py](file:///d:/Nivritha/Projects/Automation/project/ai/validator.py))**: Runs safety and verification checks on generated text to eliminate hallucinations and match profile data.
   * **AICache ([ai/cache.py](file:///d:/Nivritha/Projects/Automation/project/ai/cache.py))**: Automatically caches API responses in `data/ai_cache.json` to prevent duplicate LLM calls and costs.
+* **Granular Pipeline Logging & Skip Reasons**: Persists specific reasons for skipped jobs (e.g. location mismatch, keyword mismatch, duplicate job) directly into the database, showing exact details in status reviews, and logs the engine class name and platform before every application attempt.
 * **Multi-Platform Search & Parsing**: Seamlessly integrates with LinkedIn Easy Apply, traditional platforms (Indeed, Naukri, Glassdoor, Hirist, Foundit, Cutshort, Wellfound, Instahyre), and direct ATS job boards (Greenhouse, Lever, Ashby, Workable).
 * **Smart Scoring & Filtering**: Multi-criteria matching engine evaluates roles by title, salary, location, description, and keywords using custom scoring weights.
 * **Resume Auto-Selection**: Evaluates job descriptions to automatically select the most aligned resume template (e.g., General, Backend, AI/ML, Frontend).
-* **Automated Form Filling & Q&A**: Detects input elements dynamically, automatically handles document uploads, and resolves custom application questions.
+* **Automated Form Filling & Q&A**: Detects input elements dynamically, automatically handles document uploads, and resolves custom application questions. Supports modern layout styling by bypassing strict visibility checks on radio inputs and checkboxes that are styled visually hidden or overlaid.
 * **Human-Like Pacing & Anti-Detection**: Implements random timing delays, randomized scheduler jitters, human mouse/scrolling patterns, and persists browser sessions (cookies, logins) across runs.
 * **Interactive Control Dashboard**: A text-based `rich` console terminal dashboard for run statistics, manual resume selection reviews, retry queues, and learned company profiles.
 * **Real-time Notifications**: Instant Telegram message notifications containing application statuses, match scores, error details, and post-submission confirmation screenshots.
@@ -158,6 +160,9 @@ To run an automated job agent cycle immediately:
 ```bash
 # Run on all configured job boards (AI enabled by default)
 python main.py --site all --location "India" --ai
+
+# Run with global search (bypasses India location filter to apply to global/US targets on other boards)
+python main.py --site all --global-search --ai
 
 # Run a dry run (form filling only, no final submit click)
 python main.py --site linkedin --dry-run --ai

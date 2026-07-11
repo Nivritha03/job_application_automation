@@ -49,7 +49,7 @@ class BaseQuestionHandler(ABC):
                     role=job.title
                 )
                 
-                if ans == "REQUIRES_USER_INPUT" and fg.field_type not in ("checkbox", "radio"):
+                if ans == "REQUIRES_USER_INPUT":
                     html_context = f"name={fg.name_attr or ''} id={fg.id_attr or ''} placeholder={fg.placeholder or ''}"
                     assistant_res = ai_qa.form_assistant_fallback(
                         label=fg.label_raw or label_lower,
@@ -68,6 +68,7 @@ class BaseQuestionHandler(ABC):
                     logger.warning(f"QuestionHandler AI: Question '{fg.label_raw}' requires user input.")
                     ans = ""
                 else:
+                    ans = str(ans)
                     logger.info(f"QuestionHandler AI: Answer resolved: {ans[:60]!r}")
         return ans
 
@@ -83,13 +84,66 @@ class BaseQuestionHandler(ABC):
                 group_name = fg.name_attr
                 if group_name:
                     radios = page.locator(f"input[type='radio'][name='{group_name}']").all()
+                    logger.debug(f"QuestionHandler: Found {len(radios)} radio buttons in group {group_name!r}")
+                    
+                    # Strategy 1: exact/substring match on label or parent text
                     for r in radios:
-                        val = (r.get_attribute("value") or "").lower()
-                        # Match label check or value checks
-                        if answer_val.lower() in val or val in answer_val.lower():
+                        r_id = r.get_attribute("id")
+                        r_val = (r.get_attribute("value") or "").lower().strip()
+                        
+                        label_text = ""
+                        if r_id:
+                            lbl = page.locator(f"label[for='{r_id}']").first
+                            if lbl.count() > 0:
+                                label_text = lbl.inner_text().lower().strip()
+                        if not label_text:
+                            try:
+                                label_text = r.locator("xpath=..").inner_text().lower().strip()
+                            except:
+                                pass
+                                
+                        # Check match
+                        ans_norm = answer_val.lower().strip()
+                        if ans_norm == r_val or ans_norm in label_text or label_text in ans_norm:
                             r.check(force=True)
-                            logger.info(f"QuestionHandler: [radio] {fg.label_raw!r} -> value={val!r}")
+                            # Also click the label to trigger UI updates if input is hidden
+                            if r_id:
+                                try:
+                                    page.locator(f"label[for='{r_id}']").first.click(force=True)
+                                except:
+                                    pass
+                            logger.info(f"QuestionHandler: Checked radio matching {answer_val!r} via text {label_text!r} / value {r_val!r}")
                             return True
+                            
+                    # Strategy 2: fallback to matching value
+                    for r in radios:
+                        r_val = (r.get_attribute("value") or "").lower().strip()
+                        ans_norm = answer_val.lower().strip()
+                        if ans_norm in r_val or r_val in ans_norm:
+                            r.check(force=True)
+                            # Try clicking label if hidden
+                            r_id = r.get_attribute("id")
+                            if r_id:
+                                try:
+                                    page.locator(f"label[for='{r_id}']").first.click(force=True)
+                                except:
+                                    pass
+                            logger.info(f"QuestionHandler: Checked radio matching {answer_val!r} via value fallback {r_val!r}")
+                            return True
+                            
+                    # Strategy 3: if answer is Yes/No and we have 2 radios, map Yes -> index 0, No -> index 1
+                    ans_norm = answer_val.lower().strip()
+                    if ans_norm in ("yes", "no") and len(radios) == 2:
+                        idx = 0 if ans_norm == "yes" else 1
+                        radios[idx].check(force=True)
+                        r_id = radios[idx].get_attribute("id")
+                        if r_id:
+                            try:
+                                page.locator(f"label[for='{r_id}']").first.click(force=True)
+                            except:
+                                pass
+                        logger.info(f"QuestionHandler: Checked radio index {idx} for binary Yes/No answer {answer_val!r}")
+                        return True
             except Exception as e:
                 logger.error(f"QuestionHandler: radio selection failed: {e}")
             return False

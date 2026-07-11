@@ -198,20 +198,47 @@ class UniversalApplyEngine(ABC):
         """Safely toggle checkbox state by clicking directly or targetting label if hidden."""
         try:
             logger.info(f"UniversalEngine: fill_checkbox label={fg.label_raw!r} value={checked}")
-            # Try check() first
+            
+            # Check state first to see if we need to toggle
+            is_currently_checked = False
+            try:
+                is_currently_checked = fg.locator.is_checked()
+            except:
+                pass
+                
+            if is_currently_checked == checked:
+                logger.info("UniversalEngine: Checkbox is already in correct state.")
+                return
+
+            # Try direct check/uncheck
+            success = False
             try:
                 if checked:
-                    fg.locator.check(force=True)
+                    fg.locator.check(force=True, timeout=2000)
                 else:
-                    fg.locator.uncheck(force=True)
+                    fg.locator.uncheck(force=True, timeout=2000)
+                success = True
             except Exception:
-                # Fallback click associated label
+                pass
+                
+            if not success or (checked != fg.locator.is_checked() if hasattr(fg.locator, "is_checked") else False):
+                # Fallback to clicking the label or the locator directly
                 id_attr = fg.id_attr
                 if id_attr:
-                    label_loc = self.page.locator(f"label[for='{id_attr}']")
-                    if label_loc.count() > 0:
-                        label_loc.first.click(force=True)
+                    label_loc = self.page.locator(f"label[for='{id_attr}']").first
+                    if label_loc.count() > 0 and label_loc.is_visible():
+                        label_loc.click(force=True)
                         return
+                
+                # Check parent wrapper text and click it
+                try:
+                    parent_label = fg.locator.locator("xpath=ancestor::label").first
+                    if parent_label.count() > 0 and parent_label.is_visible():
+                        parent_label.click(force=True)
+                        return
+                except:
+                    pass
+                    
                 fg.locator.click(force=True)
         except Exception as e:
             logger.error(f"UniversalEngine: Failed fill_checkbox on '{fg.label_raw}': {e}")
@@ -380,3 +407,47 @@ class UniversalApplyEngine(ABC):
             return True
             
         return False
+
+    def _resolve_profile_field_ai(self, key: str, fg: FieldGroup) -> str:
+        """Uses Groq AI API to dynamically resolve standard profile field values when not configured statically."""
+        ai_qa = getattr(self, "ai_question_answerer", None)
+        job = getattr(self, "job", None)
+        if ai_qa and job:
+            resume_used = job.resume_used or "Resume.pdf"
+            resume_text = ""
+            try:
+                from ai.resume_ranker import AIResumeRanker
+                temp_ranker = AIResumeRanker(ai_qa.client, ai_qa.cache)
+                resume_text = temp_ranker._extract_pdf_text(resume_used)
+            except Exception:
+                pass
+            
+            logger.info(f"UniversalEngine AI: Resolving profile field '{key}' ('{fg.label_raw}') using Groq...")
+            ans = ai_qa.answer_question(
+                question=fg.label_raw or key,
+                field_type=fg.field_type,
+                job_details=f"Title: {job.title}\nDescription: {job.description}",
+                resume_text=resume_text,
+                profile_details=getattr(self, "candidate_profile", {}),
+                company=job.company,
+                role=job.title
+            )
+            if ans == "REQUIRES_USER_INPUT" and fg.field_type not in ("checkbox", "radio"):
+                html_context = f"name={fg.name_attr or ''} id={fg.id_attr or ''} placeholder={fg.placeholder or ''}"
+                assistant_res = ai_qa.form_assistant_fallback(
+                    label=fg.label_raw or key,
+                    placeholder=fg.placeholder or "",
+                    question=fg.label_raw or key,
+                    html_context=html_context,
+                    job_description=job.description,
+                    resume_text=resume_text,
+                    profile_details=getattr(self, "candidate_profile", {}),
+                    company=job.company,
+                    role=job.title
+                )
+                ans = assistant_res.get("answer", "REQUIRES_USER_INPUT")
+                
+            if ans == "REQUIRES_USER_INPUT":
+                return ""
+            return ans
+        return ""

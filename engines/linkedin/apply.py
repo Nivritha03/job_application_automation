@@ -28,6 +28,7 @@ class LinkedInApply(UniversalApplyEngine):
             logger.error(f"LinkedInApply: Failed to load answers config: {e}")
 
     def apply(self, job: Job, dry_run: bool = False, screenshot_cb=None) -> bool:
+        logger.info("LINKEDIN APPLY ENGINE")
         logger.info(f"LinkedInApply: Starting Easy Apply flow for {job.title!r} at {job.company}")
         try:
             # ── 1. Navigate to Job View ───────────────────────────────────────
@@ -224,6 +225,8 @@ class LinkedInApply(UniversalApplyEngine):
                 continue
 
             value = resolvers.get(key, self.answers.get(key, ""))
+            if not value and getattr(self, "ai_enabled", False) and getattr(self, "ai_question_answerer", None):
+                value = self._resolve_profile_field_ai(key, fg)
             if not value:
                 continue
 
